@@ -1,47 +1,25 @@
-// models/AttendanceLog.js
-module.exports = (sequelize, DataTypes) => {
-  const AttendanceLog = sequelize.define("AttendanceLog", {
-    employeeNo: {
-      type: DataTypes.STRING,
-      allowNull: false
+const { DataTypes } = require("sequelize");
+
+module.exports = (sequelize) => {
+  const AttendanceLog = sequelize.define(
+    "AttendanceLog",
+    {
+      id: { type: DataTypes.INTEGER, autoIncrement: true, primaryKey: true },
+      deviceName: { type: DataTypes.STRING, allowNull: false, defaultValue: "main" },
+
+      employeeNo: { type: DataTypes.STRING, allowNull: true },
+      name: { type: DataTypes.STRING, allowNull: true }, // DB’da xodim nomi ham chiqishi uchun
+      cardNo: { type: DataTypes.STRING, allowNull: true },
+      doorNo: { type: DataTypes.STRING, allowNull: true },
+
+      direction: { type: DataTypes.STRING, allowNull: false, defaultValue: "IN" }, // hozircha faqat IN
+      status: { type: DataTypes.STRING, allowNull: true }, // success/fail
+      dateTime: { type: DataTypes.DATE, allowNull: true },
+
+      raw: { type: DataTypes.JSONB, allowNull: true },
     },
-    name: {
-      type: DataTypes.STRING,
-    },
-    cardNo: {
-      type: DataTypes.STRING,
-    },
-    dateTime: {
-      type: DataTypes.DATE,
-    },
-    deviceName: {
-      type: DataTypes.STRING,
-      defaultValue: "main",
-    },
-    doorNo: {
-      type: DataTypes.STRING,
-    },
-    verifyMode: {
-      type: DataTypes.STRING,
-    },
-    // Yangi qo'shilgan maydonlar
-    attendanceStatus: {
-      type: DataTypes.ENUM('checkIn', 'checkOut', 'unknown'),
-      defaultValue: 'unknown'
-    },
-    checkInTime: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    checkOutTime: {
-      type: DataTypes.DATE,
-      allowNull: true
-    },
-    label: {
-      type: DataTypes.STRING,
-      allowNull: true
-    }
-  });
+    { indexes: [{ fields: ["deviceName"] }, { fields: ["employeeNo"] }, { fields: ["dateTime"] }] }
+  );
 
   return AttendanceLog;
 };

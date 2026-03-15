@@ -94,9 +94,11 @@ exports.ping = async (req, res) => {
       });
       
       if (response && response.ok) {
+        console.log(`[PING] HTTP success: ${response.status}`);
         return res.json({ success: true, message: "Device online (HTTP)" });
       }
     } catch (err) {
+      console.log(`[PING] HTTP error: ${err.message}`);
     }
 
     return res.json({ 
@@ -225,6 +227,7 @@ exports.status = async (req, res) => {
       }
       
     } catch (e) {
+      console.log("ISAPI xato:", e.message);
       
       // Basic auth bilan urinish (fallback)
       try {
@@ -362,6 +365,7 @@ exports.testDevice = async (req, res) => {
       results.status = statusRes.ok;
       if (statusRes.ok) {
         const text = await statusRes.text();
+        console.log("Device status:", text.substring(0, 200));
       }
     } catch (e) {
       results.status = false;

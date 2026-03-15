@@ -15,4 +15,12 @@ router.get("/device/test", device.testDevice);
 // attendance
 router.get("/attendance", attendance.list);
 
+// enroll
+router.post("/enroll/start", enroll.start);
+router.get("/enroll/preview.jpg", enroll.preview);
+router.post("/enroll/capture-face", enroll.captureFace);
+router.post("/enroll/confirm", enroll.confirm);
+router.get("/enroll/state", enroll.getState);  // Yangi: enroll stateni olish
+router.post("/enroll/cancel", enroll.cancel); 
+
 module.exports = router;

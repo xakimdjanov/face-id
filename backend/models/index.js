@@ -1,4 +1,4 @@
-const { Sequelize, DataTypes } = require("sequelize");
+const { Sequelize } = require("sequelize");
 require("dotenv").config();
 
 const sequelize = new Sequelize(
@@ -13,9 +13,8 @@ const sequelize = new Sequelize(
   }
 );
 
-// 🔥 ENG MUHIM — DataTypes beramiz
-const DeviceConfig = require("./deviceconfig.model")(sequelize, DataTypes);
-const Employee = require("./employee.model")(sequelize, DataTypes);
-const AttendanceLog = require("./attendance.model")(sequelize, DataTypes);
+const DeviceConfig = require("./deviceconfig.model")(sequelize);
+const Employee = require("./employee.model")(sequelize);
+const AttendanceLog = require("./attendance.model")(sequelize);
 
 module.exports = { sequelize, DeviceConfig, Employee, AttendanceLog };
