@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { userService } from "../../services/api";
 import { useNavigate } from "react-router-dom";
 import {
-  HiOutlineMail,
+  HiOutlinePhone,
   HiOutlineLockClosed,
   HiOutlineEye,
   HiOutlineEyeOff,
@@ -15,7 +15,7 @@ const Login = () => {
   const navigate = useNavigate();
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
-  const [form, setForm] = useState({ email: "", password: "" });
+  const [form, setForm] = useState({ phone: "", password: "" });
 
   const handleChange = (e) => {
     setForm((prev) => ({
@@ -67,17 +67,17 @@ const Login = () => {
         <form onSubmit={handleLogin} className="space-y-6">
           <div className="space-y-2">
             <label className="text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">
-              Email Address
+              Phone Number
             </label>
             <div className="relative group">
               <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none text-gray-400">
-                <HiOutlineMail size={22} />
+                <HiOutlinePhone size={22} />
               </div>
               <input
-                type="email"
-                name="email"
-                placeholder="example@gmail.com"
-                value={form.email}
+                type="tel"
+                name="phone"
+                placeholder="+998901234567"
+                value={form.phone}
                 onChange={handleChange}
                 required
                 className="w-full pl-12 pr-4 py-4 bg-gray-50 border-2 border-gray-50 rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all duration-300 placeholder:text-gray-300"

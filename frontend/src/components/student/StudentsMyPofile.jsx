@@ -3,7 +3,6 @@ import { getStoredUser } from "../../utils/auth";
 import { branchService } from "../../services/api";
 import { 
   HiOutlineUser, 
-  HiOutlineMail, 
   HiOutlinePhone, 
   HiOutlineOfficeBuilding, 
   HiOutlineIdentification,
@@ -65,16 +64,7 @@ const StudentsMyProfile = () => {
           <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 overflow-hidden">
             <div className="p-8 space-y-8">
               
-              {/* Email Field */}
-              <div className="flex items-center gap-5 group">
-                <div className="w-12 h-12 rounded-2xl bg-slate-50 flex items-center justify-center text-slate-400 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition-colors">
-                  <HiOutlineMail size={24} />
-                </div>
-                <div>
-                  <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-0.5">Email Address</p>
-                  <p className="font-bold text-slate-700">{user?.email || "Not provided"}</p>
-                </div>
-              </div>
+
 
               {/* Phone Field */}
               <div className="flex items-center gap-5 group">

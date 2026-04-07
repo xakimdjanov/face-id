@@ -23,7 +23,8 @@ const StudentMyGroup = () => {
       try {
         setLoading(true);
         const res = await studentGroupService.getByStudent(user.id);
-        setGroups(res.data || []);
+        const data = res?.data?.data || res?.data || [];
+        setGroups(data);
       } catch (error) {
         console.error("Group fetch error:", error);
       } finally {

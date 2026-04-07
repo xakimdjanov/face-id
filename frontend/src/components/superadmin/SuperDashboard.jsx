@@ -50,10 +50,10 @@ const SuperDashboard = () => {
   }, []);
 
   const statCards = [
-    { label: "Total Branches", value: branches.length, icon: HiOutlineOfficeBuilding, color: "text-blue-600", bg: "bg-blue-50" },
-    { label: "Students", value: stats.students, icon: HiOutlineUserGroup, color: "text-indigo-600", bg: "bg-indigo-50" },
-    { label: "Teachers", value: stats.teachers, icon: HiOutlineAcademicCap, color: "text-emerald-600", bg: "bg-emerald-50" },
-    { label: "Branch Managers", value: stats.managers, icon: HiOutlineShieldCheck, color: "text-purple-600", bg: "bg-purple-50" },
+    { label: "Barcha filiallar", value: branches.length, icon: HiOutlineOfficeBuilding, color: "text-blue-600", bg: "bg-blue-50" },
+    { label: "O'quvchilar", value: stats.students, icon: HiOutlineUserGroup, color: "text-indigo-600", bg: "bg-indigo-50" },
+    { label: "O'qituvchilar", value: stats.teachers, icon: HiOutlineAcademicCap, color: "text-emerald-600", bg: "bg-emerald-50" },
+    { label: "Filial rahbarlari", value: stats.managers, icon: HiOutlineShieldCheck, color: "text-purple-600", bg: "bg-purple-50" },
   ];
 
   if (loading) {
@@ -69,8 +69,8 @@ const SuperDashboard = () => {
       {/* Welcome Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-black text-gray-800 tracking-tight">System Overview</h1>
-          <p className="text-gray-500 mt-1 font-medium">Welcome back! Here's what's happening today.</p>
+          <h1 className="text-3xl font-black text-gray-800 tracking-tight">Tizim holati</h1>
+          <p className="text-gray-500 mt-1 font-medium italic">Xush kelibsiz! Bugungi asosiy ko'rsatkichlar bilan tanishing.</p>
         </div>
       </div>
 
@@ -82,9 +82,6 @@ const SuperDashboard = () => {
               <div className={`p-3 rounded-2xl ${card.bg} ${card.color}`}>
                 <card.icon size={24} />
               </div>
-              <span className="text-[10px] font-black text-gray-300 uppercase tracking-widest text-right leading-none">
-                Real-time<br/>Data
-              </span>
             </div>
             <div>
               <p className="text-3xl font-black text-gray-800 tracking-tighter">{card.value}</p>
@@ -96,18 +93,18 @@ const SuperDashboard = () => {
 
       <div className="w-full">
         {/* LATEST USERS TABLE */}
-        <div className="xl:col-span-2 bg-white rounded-[2rem] border border-gray-100 shadow-sm overflow-hidden">
-          <div className="p-6 border-b border-gray-50 flex justify-between items-center">
-            <h2 className="text-xl font-bold text-gray-800">Recently Joined</h2>
-            <Link to="/super/users"><button className="text-xs font-black text-blue-600 uppercase tracking-widest hover:underline">View All</button></Link>
+        <div className="xl:col-span-2 bg-white rounded-[2.2rem] border border-gray-100 shadow-sm overflow-hidden">
+          <div className="p-8 border-b border-gray-50 flex justify-between items-center">
+            <h2 className="text-xl font-black text-gray-800 uppercase tracking-tighter">Yaqinda qo'shilganlar</h2>
+            <Link to="/super/users"><button className="text-xs font-black text-blue-600 uppercase tracking-widest hover:bg-blue-50 px-4 py-2 rounded-xl transition-all">Barchasi</button></Link>
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
                 <tr className="bg-gray-50/50">
-                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">User</th>
-                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Role</th>
-                  <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Branch</th>
+                  <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Foydalanuvchi</th>
+                  <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Roli</th>
+                  <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Filiali</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
@@ -120,7 +117,7 @@ const SuperDashboard = () => {
                         </div>
                         <div>
                           <p className="text-sm font-bold text-gray-800">{user.fullname}</p>
-                          <p className="text-[11px] text-gray-400">{user.email}</p>
+                          <p className="text-[11px] font-bold text-gray-500">{user.phone}</p>
                         </div>
                       </div>
                     </td>
@@ -130,7 +127,7 @@ const SuperDashboard = () => {
                       </span>
                     </td>
                     <td className="p-4 text-sm font-bold text-gray-600">
-                      {user.branch?.name || "Global"}
+                      {user.branch?.name || "Global / Umumiy"}
                     </td>
                   </tr>
                 ))}

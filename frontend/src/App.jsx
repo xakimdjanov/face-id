@@ -18,7 +18,6 @@ import SuperUsers from "./components/superadmin/SuperUsers";
 import ManagerLayout from "./components/Layouts/ManagerLayout";
 import ManagerDashboard from "./components/manager/ManagerDashboard";
 import ManagerGroups from "./components/manager/ManagerGoups";
-import ManagerPayments from "./components/manager/ManagerPayments";
 import ManagerAdmin from "./components/manager/ManagerAdmin";
 import ManagerStudent from "./components/manager/ManagerStudent";
 import ManagerTeacher from "./components/manager/ManagerTeacher";
@@ -28,12 +27,12 @@ import StudentDetails from "./pages/Manager/StudentDetails";
 import AdminAttendance from "./components/admin/AdminAttendance";
 import AdminDashboard from "./components/admin/AdminDashboard";
 import AdminGroup from "./components/admin/AdminGroup";
-import AdminPayment from "./components/admin/AdminPayment";
 import AdminStudent from "./components/admin/AdminStudent";
 import AdminTeacher from "./components/admin/AdminTeacher";
 import AdminLayout from "./components/Layouts/AdminLayout";
 import ManagerCourse from "./components/manager/ManagerCourse";
 import AdminAddUserFace from "./pages/Admin/AdminAddUserFace";
+import AttendanceDetails from "./pages/Admin/AttendanceDetails";
 
 // Teacher
 import TeacherAttendance from "./components/teacher/TeacherAttendance";
@@ -91,7 +90,6 @@ const App = () => {
         >
           <Route path="dashboard" element={<ManagerDashboard />} />
           <Route path="groups" element={<ManagerGroups />} />
-          <Route path="payments" element={<ManagerPayments />} />
           <Route path="admins" element={<ManagerAdmin />} />
           <Route path="students" element={<ManagerStudent />} />
           <Route path="teachers" element={<ManagerTeacher />} />
@@ -109,10 +107,10 @@ const App = () => {
         >
           <Route path="dashboard" element={<AdminDashboard />} />
           <Route path="groups" element={<AdminGroup />} />
-          <Route path="payments" element={<AdminPayment />} />
           <Route path="students" element={<AdminStudent />} />
           <Route path="teachers" element={<AdminTeacher />} />
           <Route path="attendance" element={<AdminAttendance />} />
+          <Route path="attendance-details/:employeeNo/:date" element={<AttendanceDetails />} />
           <Route path="addface" element={<AdminAddUserFace />} />
         </Route>
 

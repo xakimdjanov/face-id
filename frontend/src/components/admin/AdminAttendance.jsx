@@ -1,10 +1,15 @@
 import React, { useEffect, useState } from "react";
 import {
   FiPlus,
-  FiRefreshCw,
   FiWifi,
   FiWifiOff,
+  FiClock,
+  FiCalendar,
+  FiUser,
+  FiChevronDown,
+  FiChevronUp,
 } from "react-icons/fi";
+import { HiOutlineClipboardCheck } from "react-icons/hi";
 import toast, { Toaster } from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import {
@@ -27,22 +32,14 @@ export default function AdminAttendance() {
   const [roleFilter, setRoleFilter] = useState("all");
   const [monthFilter, setMonthFilter] = useState("");
   const [activePeriod, setActivePeriod] = useState("today");
-  const [showClearConfirm, setShowClearConfirm] = useState(false);
 
   const [attendanceFilters, setAttendanceFilters] = useState({
     startDate: "",
     endDate: "",
     employeeNo: "",
     verifyMode: "",
-    limit: 50,
+    limit: 100,
     page: 1,
-  });
-
-  const [attendancePagination, setAttendancePagination] = useState({
-    total: 0,
-    page: 1,
-    limit: 50,
-    totalPages: 1,
   });
 
   const months = [
@@ -64,9 +61,9 @@ export default function AdminAttendance() {
     const loadUsers = async () => {
       try {
         const res = await userService.getAll();
-        setUsers(res.data || res.data?.data || []);
+        setUsers(res.data?.data || res.data || []);
       } catch (err) {
-        console.log(err);
+        console.error(err);
       }
     };
     loadUsers();
@@ -79,7 +76,7 @@ export default function AdminAttendance() {
         const groups = Array.isArray(res.data) ? res.data : res.data?.data || [];
         setStudentGroups(groups);
       } catch (err) {
-        console.log(err);
+        console.error(err);
       }
     };
     loadStudentGroups();
@@ -101,9 +98,9 @@ export default function AdminAttendance() {
   }, []);
 
   // ATTENDANCE LOAD
-  const fetchAttendanceList = async () => {
+  const fetchAttendanceList = async (silent = false) => {
     if (!userBranchId) return;
-    setAttendanceLoading(true);
+    if (!silent) setAttendanceLoading(true);
     try {
       const res = await attendanceFaceService.getAll({
         ...attendanceFilters,
@@ -112,104 +109,76 @@ export default function AdminAttendance() {
       const data = res?.data?.data || [];
 
       setAttendanceList((prev) => {
-        const prevStr = JSON.stringify(prev);
-        const newStr = JSON.stringify(data);
-        if (prevStr === newStr) return prev;
+        if (JSON.stringify(prev) === JSON.stringify(data)) return prev;
         return data;
       });
-
-      setAttendancePagination(
-        res.data.pagination || {
-          total: data.length,
-          page: attendanceFilters.page,
-          limit: attendanceFilters.limit,
-          totalPages: Math.ceil(data.length / attendanceFilters.limit),
-        }
-      );
     } catch (err) {
-      console.log(err);
-      toast.error("Davomat yuklab bo'lmadi");
+      if (!silent) toast.error("Davomat yuklab bo'lmadi");
     } finally {
-      setAttendanceLoading(false);
+      if (!silent) setAttendanceLoading(false);
     }
   };
 
-  // Har qanday filtr o'zgarganda bir marta yuklash
   useEffect(() => {
-    if (userBranchId) {
-      fetchAttendanceList();
-    }
-  }, [
-    userBranchId,
-    attendanceFilters.startDate,
-    attendanceFilters.endDate,
-    attendanceFilters.page,
-    attendanceFilters.limit,
-  ]);
+    if (userBranchId) fetchAttendanceList();
+  }, [userBranchId, attendanceFilters.startDate, attendanceFilters.endDate]);
 
-  // Faqat "today" rejimida har 3 soniyada yangilash
   useEffect(() => {
-    if (!userBranchId) return;
-    if (activePeriod !== "today") return;
-
-    const interval = setInterval(() => {
-      fetchAttendanceList();
-    }, 3000);
-
+    if (!userBranchId || activePeriod !== "today") return;
+    const interval = setInterval(() => fetchAttendanceList(true), 3000);
     return () => clearInterval(interval);
   }, [userBranchId, activePeriod]);
 
-  // Helper functions (o'zgarmagan)
-  const getUserRole = (userId) => {
-    if (!userId) return "xodim";
-    const user = users.find((u) => Number(u.id) === Number(userId));
+  // Helpers
+  const getUserRoleLabel = (employeeNo, employeeId, name) => {
+    const normSearchName = String(name || "").replace(/\s+/g, '').toLowerCase();
+    const user = users.find((u) => 
+      (employeeId && Number(u.id) === Number(employeeId)) || 
+      (employeeNo && String(u.employeeNo).trim() === String(employeeNo).trim()) ||
+      (normSearchName !== "" && String(u.fullname || u.name || "").replace(/\s+/g, '').toLowerCase() === normSearchName)
+    );
+    const roleMap = {
+      student: "Talaba",
+      teacher: "O'qituvchi",
+      admin: "Admin",
+      manager: "Rahbar"
+    };
+    return roleMap[user?.role] || "Xodim";
+  };
+
+  const getUserRole = (employeeNo, employeeId, name) => {
+    const normSearchName = String(name || "").replace(/\s+/g, '').toLowerCase();
+    const user = users.find((u) => 
+      (employeeId && Number(u.id) === Number(employeeId)) || 
+      (employeeNo && String(u.employeeNo).trim() === String(employeeNo).trim()) ||
+      (normSearchName !== "" && String(u.fullname || u.name || "").replace(/\s+/g, '').toLowerCase() === normSearchName)
+    );
     return user?.role || "xodim";
   };
 
-  const getEmployeeStatus = (att) => {
+  const getAttendanceStatus = (att) => {
     if (!att.firstIn) return "KELMADI";
-    return att.lastOut ? "KETGAN" : "BINODA";
+    if (!att.lastOut) return "BINODA";
+    return new Date(att.lastIn) > new Date(att.lastOut) ? "BINODA" : "KETGAN";
   };
 
-  const getStudentSchedule = (userId) => {
-    const sg = studentGroups.find((s) => Number(s.studentId) === Number(userId));
+  const getStudentSchedule = (employeeNo, employeeId, name) => {
+    const normSearchName = String(name || "").replace(/\s+/g, '').toLowerCase();
+    const user = users.find((u) => 
+      (employeeId && Number(u.id) === Number(employeeId)) || 
+      (employeeNo && String(u.employeeNo).trim() === String(employeeNo).trim()) ||
+      (normSearchName !== "" && String(u.fullname || u.name || "").replace(/\s+/g, '').toLowerCase() === normSearchName)
+    );
+    const sg = studentGroups.find((s) => Number(s.studentId) === Number(user?.id));
     return sg ? {
       name: sg.group.name,
       start: sg.group.startTime,
       end: sg.group.endTime,
-      days: sg.group.days,
     } : null;
   };
 
-  const getDayShort = (dateStr) => {
-    const days = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-    return days[new Date(dateStr).getDay()];
-  };
-
-  const getStudentAttendanceStatus = (att) => {
-    const schedule = getStudentSchedule(att.userId);
-    if (!schedule) return "—";
-    const day = getDayShort(att.firstIn || att.date);
-    if (!schedule.days.includes(day)) return "DARS YO'Q";
-
-    const start = new Date(`${att.date}T${schedule.start}`);
-    const end = new Date(`${att.date}T${schedule.end}`);
-    let total = 0;
-    const pairs = Math.min(att.ins.length, att.outs.length);
-    for (let i = 0; i < pairs; i++) {
-      const inTime = new Date(att.ins[i]);
-      const outTime = new Date(att.outs[i]);
-      const realStart = inTime > start ? inTime : start;
-      const realEnd = outTime < end ? outTime : end;
-      if (realEnd > realStart) total += realEnd - realStart;
-    }
-    return (total / (1000 * 60)) >= 30 ? "KELDI" : "KELMADI";
-  };
-
   const getDisplayName = (att) => {
-    if (att.employee?.name && !att.employee.name.toLowerCase().startsWith("user")) {
-      return att.employee.name;
-    }
+    if (att.employee?.name && !att.employee.name.toLowerCase().startsWith("user")) return att.employee.name;
     const rawName = att.rawData?.AccessControllerEvent?.name?.trim();
     if (rawName && !rawName.toLowerCase().startsWith("user")) return rawName;
     return att.employeeNo || "—";
@@ -217,15 +186,17 @@ export default function AdminAttendance() {
 
   const getEventLabel = (att) => {
     const event = att.rawData?.AccessControllerEvent;
-    if (!event) return att.eventType;
-    if (event.attendanceStatus === "checkIn") return "KIRISH";
-    if (event.attendanceStatus === "checkOut") return "CHIQISH";
-    return att.eventType;
+    if (event?.attendanceStatus === "checkIn") return "KIRISH";
+    if (event?.attendanceStatus === "checkOut") return "CHIQISH";
+    return att.eventType || "UNKNOWN";
   };
 
   const formatTime = (dateStr) => dateStr ? new Date(dateStr).toLocaleTimeString("uz-UZ", { hour: "2-digit", minute: "2-digit" }) : "—";
-
-  const formatDate = (dateStr) => dateStr ? new Date(dateStr).toLocaleDateString("uz-UZ") : "—";
+  const formatDate = (dateStr) => {
+    if (!dateStr) return "—";
+    const d = new Date(dateStr);
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  };
 
   const calculateWorkTime = (ins, outs) => {
     let total = 0;
@@ -235,8 +206,8 @@ export default function AdminAttendance() {
       const end = new Date(outs[i]);
       if (end > start) total += end - start;
     }
-    const hours = Math.floor(total / (1000 * 60 * 60));
-    const minutes = Math.floor((total % (1000 * 60 * 60)) / (1000 * 60));
+    const hours = Math.floor(total / 3600000);
+    const minutes = Math.floor((total % 3600000) / 60000);
     return `${hours} soat ${minutes} daqiqa`;
   };
 
@@ -245,12 +216,27 @@ export default function AdminAttendance() {
     list.forEach((item) => {
       const name = getDisplayName(item);
       const date = formatDate(item.eventTime);
-      const userId = item.rawData?.AccessControllerEvent?.employeeNoString;
-      const key = `${userId}_${date}`;
+      const normalizedName = name.replace(/\s+/g, '').toLowerCase();
+      const key = `${normalizedName}_${date}`;
+
+      const empId = item.employee?.id || item.employeeId;
+      const empNo = item.employeeNo || item.rawData?.AccessControllerEvent?.employeeNoString;
       const label = getEventLabel(item);
       const time = item.eventTime;
 
-      if (!map[key]) map[key] = { name, date, userId, ins: [], outs: [] };
+      if (!map[key]) {
+        map[key] = { 
+            name, 
+            date, 
+            employeeNo: empNo, 
+            employeeId: empId,
+            ins: [], 
+            outs: [],
+            all: []
+        };
+      }
+      
+      map[groupMapKey(key)].all.push(item); // Not really needed, just for structure
       if (label === "KIRISH") map[key].ins.push(time);
       if (label === "CHIQISH") map[key].outs.push(time);
     });
@@ -263,17 +249,21 @@ export default function AdminAttendance() {
         ins: insSorted,
         outs: outsSorted,
         firstIn: insSorted[0] || null,
+        lastIn: insSorted[insSorted.length - 1] || null,
         lastOut: outsSorted[outsSorted.length - 1] || null,
       };
     });
   };
 
+  // Helper for key normalization
+  const groupMapKey = (key) => key; 
+
   const groupedAttendance = groupAttendance(attendanceList);
   const filteredAttendance = roleFilter === "all"
     ? groupedAttendance
-    : groupedAttendance.filter((att) => getUserRole(att.userId) === roleFilter);
+    : groupedAttendance.filter((att) => getUserRole(att.employeeNo, att.employeeId, att.name) === roleFilter);
 
-  // Filter funksiyalari
+  // Filters
   const setTodayFilter = () => {
     const today = new Date().toISOString().slice(0, 10);
     setAttendanceFilters((prev) => ({ ...prev, startDate: today, endDate: today, page: 1 }));
@@ -283,10 +273,8 @@ export default function AdminAttendance() {
 
   const setWeekFilter = () => {
     const now = new Date();
-    const first = new Date(now);
-    first.setDate(now.getDate() - now.getDay());
-    const last = new Date(first);
-    last.setDate(first.getDate() + 6);
+    const first = new Date(now.setDate(now.getDate() - now.getDay()));
+    const last = new Date(now.setDate(now.getDate() - now.getDay() + 6));
     setAttendanceFilters((prev) => ({
       ...prev,
       startDate: first.toISOString().slice(0, 10),
@@ -298,14 +286,8 @@ export default function AdminAttendance() {
   };
 
   const handleMonthChange = (monthIndex) => {
-    const value = monthIndex === "" ? "" : String(monthIndex);
-    setMonthFilter(value);
-
-    if (value === "") {
-      setActivePeriod("");
-      return;
-    }
-
+    setMonthFilter(monthIndex);
+    if (monthIndex === "") return;
     const year = new Date().getFullYear();
     const first = new Date(year, Number(monthIndex), 1);
     const last = new Date(year, Number(monthIndex) + 1, 0);
@@ -318,265 +300,188 @@ export default function AdminAttendance() {
     setActivePeriod("month");
   };
 
-  // Dastlabki yuklanishda bugungi kunni tanlash
-  useEffect(() => {
-    setTodayFilter();
-  }, []);
-
-  // Loglarni tozalash - modal bilan
-  const handleClearDeviceLogs = async () => {
-    setShowClearConfirm(false);
-    try {
-      const res = await deviceService.clearLogs();
-      if (res.data.success) {
-        toast.success("Qurilma loglari muvaffaqiyatli tozalandi");
-      } else {
-        toast.error("Tozalash muvaffaqiyatsiz yakunlandi");
-      }
-    } catch (err) {
-      console.error("Clear logs error:", err);
-      toast.error("Loglarni tozalashda xatolik yuz berdi");
-    }
-  };
+  useEffect(() => { setTodayFilter(); }, []);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 p-6 md:p-8">
+    <div className="min-h-screen bg-slate-50 p-6 md:p-8">
       <Toaster position="top-right" />
 
       <div className="max-w-7xl mx-auto space-y-6">
-        {/* Header / Filter Panel */}
-        <div className="bg-white/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-3xl p-5 border border-gray-100/50">
-          <div className="flex flex-wrap items-center justify-between gap-5 md:gap-6">
-
-            {/* Role filter */}
-            <div className="min-w-[180px]">
-              <div className="relative">
-                <select
-                  value={roleFilter}
-                  onChange={(e) => setRoleFilter(e.target.value)}
-                  className="w-full appearance-none rounded-2xl border border-gray-200 bg-gray-50/60 px-4 py-2.5 pr-10 text-sm font-medium text-gray-700 shadow-sm transition-all focus:border-blue-400 focus:bg-white focus:ring-2 focus:ring-blue-500/30 hover:border-gray-300 outline-none cursor-pointer"
-                >
-                  <option value="all">Barcha rollar</option>
-                  <option value="student">Talabalar</option>
-                  <option value="teacher">O‘qituvchilar</option>
-                  <option value="admin">Admin</option>
-                  <option value="manager">Rahbarlar</option>
-                </select>
-                <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-gray-400">
-                  <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
+        {/* Header Panel */}
+        <div className="bg-white shadow-sm rounded-3xl p-6 border border-blue-50 flex flex-wrap items-center justify-between gap-6">
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-blue-600 rounded-2xl text-white shadow-lg shadow-blue-200">
+                <HiOutlineClipboardCheck size={28} />
             </div>
+            <div>
+                <h1 className="text-2xl font-black text-gray-800 uppercase tracking-tight">Davomat Kontroli</h1>
+                <div className="flex items-center gap-2 mt-0.5">
+                    <div className={`h-2 w-2 rounded-full ${deviceStatus === "online" ? "bg-emerald-500 animate-pulse" : "bg-rose-500"}`} />
+                    <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{deviceStatus}</span>
+                </div>
+            </div>
+          </div>
 
-            {/* Period filters */}
-            <div className="flex items-center gap-1.5 rounded-2xl bg-gray-100/60 p-1.5 shadow-inner">
-              <button
-                onClick={setTodayFilter}
-                className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all ${
-                  activePeriod === "today"
-                    ? "bg-white shadow text-blue-700"
-                    : "text-gray-600 hover:bg-white hover:text-blue-700 hover:shadow"
-                } active:scale-95`}
-              >
-                Bugun
-              </button>
+          <div className="flex flex-wrap items-center gap-3">
+             <select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold text-gray-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+             >
+                <option value="all">Barcha Rollar</option>
+                <option value="student">Talabalar</option>
+                <option value="teacher">O‘qituvchilar</option>
+                <option value="manager">Rahbarlar</option>
+             </select>
 
-              <button
-                onClick={setWeekFilter}
-                className={`rounded-xl px-5 py-2 text-sm font-semibold transition-all ${
-                  activePeriod === "week"
-                    ? "bg-white shadow text-purple-700"
-                    : "text-gray-600 hover:bg-white hover:text-purple-700 hover:shadow"
-                } active:scale-95`}
-              >
-                Hafta
-              </button>
+             <div className="flex bg-slate-100 p-1 rounded-xl">
+               <button onClick={setTodayFilter} className={`px-5 py-2 rounded-lg text-xs font-black uppercase transition-all ${activePeriod === "today" ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}>Bugun</button>
+               <button onClick={setWeekFilter} className={`px-5 py-2 rounded-lg text-xs font-black uppercase transition-all ${activePeriod === "week" ? "bg-white text-blue-600 shadow-sm" : "text-gray-400"}`}>Hafta</button>
+             </div>
 
-              <div className="h-5 w-px bg-gray-300 mx-1.5" />
-
-              <select
+             <select
                 value={monthFilter}
                 onChange={(e) => handleMonthChange(e.target.value)}
-                className={`rounded-xl bg-transparent px-4 py-2 text-sm font-medium transition-colors cursor-pointer ${
-                  activePeriod === "month" ? "text-indigo-700 font-semibold" : "text-gray-600 hover:text-gray-900"
-                } focus:ring-0 focus:outline-none`}
-              >
+                className="bg-slate-50 border-none rounded-xl px-4 py-2.5 text-sm font-bold text-gray-600 focus:ring-2 focus:ring-blue-500 outline-none cursor-pointer"
+             >
                 <option value="">Oylar</option>
-                {months.map((month, index) => (
-                  <option key={index} value={index}>{month}</option>
-                ))}
-              </select>
-            </div>
+                {months.map((m, i) => <option key={i} value={i}>{m}</option>)}
+             </select>
 
-            {/* Actions & Status */}
-            <div className="flex flex-wrap items-center gap-4 md:gap-5">
-              <div
-                className={`flex items-center gap-2.5 rounded-2xl border px-4 py-2 text-xs font-bold uppercase tracking-wide transition-all ${
-                  deviceStatus === "online"
-                    ? "border-emerald-200 bg-emerald-50/80 text-emerald-700"
-                    : "border-rose-200 bg-rose-50/80 text-rose-700"
-                }`}
-              >
-                <span
-                  className={`h-2.5 w-2.5 rounded-full animate-pulse ${
-                    deviceStatus === "online" ? "bg-emerald-500" : "bg-rose-500"
-                  }`}
-                />
-                {deviceStatus === "online" ? "Online" : "Offline"}
-              </div>
-
-              <div className="flex items-center gap-2.5">
-                <button
-                  onClick={() => setShowClearConfirm(true)}
-                  className="rounded-2xl border border-gray-200 bg-white p-2.5 text-gray-500 transition-all hover:border-red-200 hover:bg-red-50 hover:text-red-600 active:scale-95 shadow-sm"
-                  title="Loglarni tozalash"
-                >
-                  <FiRefreshCw className="h-5 w-5" />
-                </button>
-
-                <button
-                  onClick={() => navigate("/admin/addface")}
-                  className="flex items-center gap-2 rounded-2xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-lg shadow-indigo-200/50 transition-all hover:bg-indigo-700 hover:shadow-md active:scale-[0.98]"
-                >
-                  <FiPlus className="h-5 w-5" />
-                  Qo‘shish
-                </button>
-              </div>
-            </div>
+             <button
+                onClick={() => navigate("/admin/addface")}
+                className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2.5 rounded-xl text-sm font-black uppercase shadow-lg shadow-blue-200 transition-all active:scale-95 flex items-center gap-2"
+             >
+                <FiPlus size={20} />
+                Qo‘shish
+             </button>
           </div>
         </div>
 
-        {/* Table */}
-        <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+        {/* Table Content */}
+        <div className="bg-white rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
           {attendanceLoading ? (
-            <div className="flex h-64 items-center justify-center">
-              <div className="h-10 w-10 animate-spin rounded-full border-4 border-indigo-500 border-t-transparent"></div>
+            <div className="flex h-96 items-center justify-center">
+              <div className="h-12 w-12 animate-spin rounded-full border-4 border-blue-600 border-t-transparent"></div>
             </div>
           ) : (
             <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50 sticky top-0 z-10">
-                  <tr className="text-xs uppercase tracking-wider text-gray-600">
-                    <th className="p-4 text-left">#</th>
-                    <th className="p-4 text-left">Xodim</th>
-                    <th className="p-4 text-left">Sana</th>
-                    <th className="p-4 text-left">Kirish</th>
-                    <th className="p-4 text-left">Chiqish</th>
-                    <th className="p-4 text-left">Role</th>
-                    <th className="p-4 text-left">Ish vaqti / Dars</th>
-                    <th className="p-4 text-left">Status</th>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-slate-50/50 border-b border-slate-100">
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center w-16">№</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Foydalanuvchi</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Sana</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Kirish</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Chiqish</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Asosiy Role</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Ish Vaqti / Dars</th>
+                    <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-100">
+                <tbody className="divide-y divide-slate-50">
                   {filteredAttendance.map((att, index) => {
-                    const role = getUserRole(att.userId);
-                    const isStudent = role === "student";
+                  const role = getUserRole(att.employeeNo, att.employeeId, att.name);
+                  const isStudent = role === "student";
+                  const isOpen = openRow === index;
 
-                    return (
-                      <React.Fragment key={`${att.userId}-${att.date}`}>
-                        <tr
-                          className="hover:bg-slate-50 transition cursor-pointer"
-                          onClick={() => setOpenRow(openRow === index ? null : index)}
-                        >
-                          <td className="p-4 text-gray-500">{index + 1}</td>
-                          <td className="p-4 font-semibold text-gray-800">{att.name}</td>
-                          <td className="p-4 text-gray-600">{att.date}</td>
-                          <td className="p-4">
-                            <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-700 text-xs font-semibold">
-                              {formatTime(att.firstIn)}
+                  return (
+                    <React.Fragment key={index}>
+                      <tr
+                        className="hover:bg-blue-50/20 transition-all cursor-pointer"
+                        onClick={() => setOpenRow(isOpen ? null : index)}
+                      >
+                        <td className="p-5 text-center text-sm font-bold text-gray-400">{index + 1}</td>
+                        <td className="p-5 font-bold text-gray-800 text-sm">{att.name}</td>
+                        <td className="p-5 text-gray-500 font-bold text-xs uppercase">{att.date}</td>
+                        <td className="p-5">
+                          <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-xs font-black border border-emerald-100">
+                            {formatTime(att.firstIn)}
+                          </span>
+                        </td>
+                        <td className="p-5">
+                          <span className="px-3 py-1 bg-rose-50 text-rose-600 rounded-lg text-xs font-black border border-rose-100">
+                            {formatTime(att.lastOut)}
+                          </span>
+                        </td>
+                        <td className="p-5">
+                          <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase border ${
+                            isStudent ? "bg-blue-50 text-blue-600 border-blue-100" : "bg-slate-50 text-slate-600 border-slate-200"
+                          }`}>
+                            {getUserRoleLabel(att.employeeNo, att.employeeId, att.name)}
+                          </span>
+                        </td>
+                        <td className="p-5">
+                          <div className="flex flex-col">
+                            <span className="text-gray-800 font-bold text-xs">
+                              {calculateWorkTime(att.ins, att.outs)}
                             </span>
-                          </td>
-                          <td className="p-4">
-                            <span className="px-3 py-1 rounded-full bg-rose-100 text-rose-700 text-xs font-semibold">
-                              {formatTime(att.lastOut)}
-                            </span>
-                          </td>
-                          <td className="p-4">
-                            <span className={`px-3 py-1 rounded-lg text-xs font-bold uppercase ${
-                              isStudent ? "bg-violet-100 text-violet-700" : "bg-blue-100 text-blue-700"
-                            }`}>
-                              {role}
-                            </span>
-                          </td>
-                          <td className="p-4 text-sm">
-                            {isStudent ? (
+                            {isStudent && (
                               (() => {
-                                const sch = getStudentSchedule(att.userId);
+                                const sch = getStudentSchedule(att.employeeNo, att.employeeId, att.name);
                                 return sch ? (
-                                  <div className="text-xs space-y-1">
-                                    <div className="font-semibold text-gray-800">{sch.name}</div>
-                                    <div className="text-gray-600">
-                                      {sch.start.slice(0, 5)} – {sch.end.slice(0, 5)}
-                                    </div>
-                                  </div>
-                                ) : "—";
-                              })()
-                            ) : (
-                              <span className="font-medium text-gray-800">
-                                {calculateWorkTime(att.ins, att.outs)}
-                              </span>
-                            )}
-                          </td>
-                          <td className="p-4">
-                            {isStudent ? (
-                              (() => {
-                                const status = getStudentAttendanceStatus(att);
-                                const styles = {
-                                  KELDI: "bg-emerald-100 text-emerald-800",
-                                  KELMADI: "bg-rose-100 text-rose-800",
-                                  "DARS YO'Q": "bg-gray-100 text-gray-600",
-                                };
-                                return (
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
-                                    {status}
+                                  <span className="text-[9px] text-gray-400 font-black uppercase tracking-tighter truncate max-w-[150px]">
+                                    {sch.name} ({sch.start.slice(0, 5)}–{sch.end.slice(0, 5)})
                                   </span>
-                                );
-                              })()
-                            ) : (
-                              (() => {
-                                const status = getEmployeeStatus(att);
-                                const styles = {
-                                  BINODA: "bg-emerald-100 text-emerald-800",
-                                  KETGAN: "bg-blue-100 text-blue-800",
-                                  KELMADI: "bg-rose-100 text-rose-800",
-                                };
-                                return (
-                                  <span className={`px-3 py-1 rounded-full text-xs font-bold ${styles[status]}`}>
-                                    {status}
-                                  </span>
-                                );
+                                ) : null;
                               })()
                             )}
+                          </div>
+                        </td>
+                          <td className="p-5 text-center">
+                            <div className="flex items-center justify-center gap-2">
+                                <span className={`px-3 py-1 rounded-lg text-[9px] font-black uppercase tracking-wider border ${
+                                    getAttendanceStatus(att) === "BINODA" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+                                    getAttendanceStatus(att) === "KETGAN" ? "bg-blue-50 text-blue-600 border-blue-100" :
+                                    "bg-rose-50 text-rose-600 border-rose-100"
+                                }`}>
+                                    {getAttendanceStatus(att)}
+                                </span>
+                                {isOpen ? <FiChevronUp className="text-gray-400" /> : <FiChevronDown className="text-gray-400" />}
+                            </div>
                           </td>
                         </tr>
 
-                        {openRow === index && (
-                          <tr className="bg-slate-50">
-                            <td colSpan={8} className="p-5">
-                              <div className="grid md:grid-cols-2 gap-8 text-sm">
-                                <div>
-                                  <p className="font-semibold text-gray-800 mb-2">Qo'shimcha kirishlar:</p>
-                                  {att.ins.slice(1).length ? (
-                                    att.ins.slice(1).map((t, i) => (
-                                      <div key={i} className="text-gray-600">↳ {formatTime(t)}</div>
-                                    ))
-                                  ) : (
-                                    <div className="text-gray-500 italic">—</div>
-                                  )}
+                        {isOpen && (
+                          <tr className="bg-slate-50/50">
+                            <td colSpan={8} className="p-8">
+                                <div className="grid md:grid-cols-2 gap-12 max-w-4xl mx-auto">
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 text-blue-600"><FiClock size={48} /></div>
+                                        <h4 className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-blue-600 rounded-full" />
+                                            Kirish amallari
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {att.ins.length > 0 ? (
+                                                att.ins.map((t, i) => (
+                                                    <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                                                        <span className="text-gray-400 font-bold text-[10px]"># {i+1} urinish</span>
+                                                        <span className="text-gray-800 font-black text-sm">{formatTime(t)}</span>
+                                                    </div>
+                                                ))
+                                            ) : <p className="text-gray-400 italic text-xs">Ma'lumot yo'q</p>}
+                                        </div>
+                                    </div>
+
+                                    <div className="bg-white p-6 rounded-2xl border border-slate-100 shadow-sm relative overflow-hidden">
+                                        <div className="absolute top-0 right-0 p-4 opacity-5 text-rose-600"><FiClock size={48} /></div>
+                                        <h4 className="text-[10px] font-black text-rose-600 uppercase tracking-widest mb-4 flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 bg-rose-600 rounded-full" />
+                                            Chiqish amallari
+                                        </h4>
+                                        <div className="space-y-3">
+                                            {att.outs.length > 0 ? (
+                                                att.outs.map((t, i) => (
+                                                    <div key={i} className="flex items-center justify-between py-2 border-b border-slate-50 last:border-0">
+                                                        <span className="text-gray-400 font-bold text-[10px]"># {i+1} urinish</span>
+                                                        <span className="text-gray-800 font-black text-sm">{formatTime(t)}</span>
+                                                    </div>
+                                                ))
+                                            ) : <p className="text-gray-400 italic text-xs">Ma'lumot yo'q</p>}
+                                        </div>
+                                    </div>
                                 </div>
-                                <div>
-                                  <p className="font-semibold text-gray-800 mb-2">Qo'shimcha chiqishlar:</p>
-                                  {att.outs.slice(0, -1).length ? (
-                                    att.outs.slice(0, -1).map((t, i) => (
-                                      <div key={i} className="text-gray-600">↳ {formatTime(t)}</div>
-                                    ))
-                                  ) : (
-                                    <div className="text-gray-500 italic">—</div>
-                                  )}
-                                </div>
-                              </div>
                             </td>
                           </tr>
                         )}
@@ -586,8 +491,11 @@ export default function AdminAttendance() {
 
                   {filteredAttendance.length === 0 && !attendanceLoading && (
                     <tr>
-                      <td colSpan={8} className="py-16 text-center text-gray-500">
-                        Tanlangan filtr bo‘yicha ma’lumot topilmadi...
+                      <td colSpan={8} className="py-32 text-center">
+                         <div className="inline-flex p-8 bg-slate-50 rounded-full text-slate-200 mb-4">
+                            <FiCalendar size={64} />
+                         </div>
+                         <p className="text-slate-400 font-black uppercase tracking-widest text-xs">Ma'lumot topilmadi</p>
                       </td>
                     </tr>
                   )}
@@ -597,33 +505,6 @@ export default function AdminAttendance() {
           )}
         </div>
       </div>
-
-      {/* Modal for clear logs */}
-      {showClearConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-40 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-xl">
-            <h3 className="text-lg font-bold text-gray-900">Loglarni tozalash</h3>
-            <p className="mt-3 text-gray-600">
-              Qurilmadagi barcha loglar o‘chiriladi.<br />
-              Bu amalni qaytarib bo‘lmaydi. Rostan ham davom ettirasizmi?
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                onClick={() => setShowClearConfirm(false)}
-                className="px-5 py-2.5 text-sm font-medium text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
-              >
-                Bekor qilish
-              </button>
-              <button
-                onClick={handleClearDeviceLogs}
-                className="px-5 py-2.5 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700"
-              >
-                Tozalash
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

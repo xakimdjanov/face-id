@@ -1,11 +1,14 @@
 import axios from 'axios';
 
-const API_BASE_URL = "http://localhost:5000"; // 5000 portga o'zgartirildi
+const API_BASE_URL = "https://snubbier-cicatrisant-clara.ngrok-free.dev"; // 5000 portga o'zgartirildi
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   timeout: 10000,
-  headers: { "Content-Type": "application/json" },
+  headers: { 
+    "Content-Type": "application/json",
+    "ngrok-skip-browser-warning": "69420"
+  },
 });
 
 // Request interceptor - token qo'shish
@@ -33,7 +36,8 @@ axiosInstance.interceptors.response.use(
   }
 );
 
-// ATTENDANCE (DAVOMAT)
+// MANUAL ATTENDANCE (ORQALI DAVOMAT) - Removed since only Face-ID is used
+/*
 export const attendanceService = {
   register: (data) => axiosInstance.post("/api/attendance", data),
   getAll: () => axiosInstance.get("/api/attendance"),
@@ -44,6 +48,7 @@ export const attendanceService = {
   update: (id, data) => axiosInstance.put(`/api/attendance/${id}`, data),
   delete: (id) => axiosInstance.delete(`/api/attendance/${id}`),
 };
+*/
 
 // BRANCH (FILIAL)
 export const branchService = {
@@ -74,16 +79,6 @@ export const groupService = {
   delete: (id) => axiosInstance.delete(`/api/groups/${id}`),
 };
 
-// PAYMENTS (TO'LOVLAR)
-export const paymentService = {
-  create: (data) => axiosInstance.post("/api/payments", data),
-  getAll: () => axiosInstance.get("/api/payments"),
-  getById: (studentId) =>
-    axiosInstance.get(`/api/payments/student/${studentId}`),
-  getDebts: () => axiosInstance.get("/api/payments/debts"),
-  update: (id, data) => axiosInstance.put(`/api/payments/${id}`, data),
-  delete: (id) => axiosInstance.delete(`/api/payments/${id}`),
-};
 
 // STUDENT GROUP (STUDENT GURUHLARI)
 export const studentGroupService = {
@@ -107,6 +102,7 @@ export const userService = {
 // EMPLOYEE (XODIM) - ENROLL UCHUN
 export const employeeService = {
   startEnroll: (data) => axiosInstance.post("/api/employee/start", data),
+  getAll: () => axiosInstance.get("/api/employee"),
   preview: () => `${API_BASE_URL}/api/employee/preview.jpg`,
   captureFace: (employeeNo) =>
     axiosInstance.post(`/api/employee/capture-face?employeeNo=${employeeNo}`),
@@ -141,6 +137,12 @@ export const attendanceFaceService = {
   getAll: (params) => {
     const queryParams = new URLSearchParams(params).toString();
     return axiosInstance.get(`/api/attendance-face${queryParams ? `?${queryParams}` : ''}`);
+  },
+
+  // Talabaning o'z attendance loglarini olish
+  getMyAttendance: (params) => {
+    const queryParams = new URLSearchParams(params).toString();
+    return axiosInstance.get(`/api/attendance-face/my${queryParams ? `?${queryParams}` : ''}`);
   },
 
   // Bugungi attendance loglarni olish
@@ -208,7 +210,8 @@ export const attendanceFaceService = {
 
   // WebSocket orqali real-time ulanish
   connectWebSocket: (onMessage, onError, onClose) => {
-    const ws = new WebSocket('ws://localhost:5000/ws/enroll');
+    const wsURL = API_BASE_URL.replace("https://", "wss://").replace("http://", "ws://");
+    const ws = new WebSocket(`${wsURL}/ws/enroll`);
     
     ws.onopen = () => console.log('🔌 WebSocket connected');
     ws.onmessage = (event) => {

@@ -1,65 +1,58 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { 
   HiOutlineUsers, 
-  HiOutlineAcademicCap, 
-  HiOutlineCurrencyDollar, 
-  HiOutlineTrendingUp,
-  HiOutlineArrowSmUp,
-  HiOutlineArrowSmDown,
-  HiOutlineDotsVertical
+  HiOutlineAcademicCap,
+  HiOutlineViewGrid,
+  HiOutlinePlusCircle,
+  HiOutlineBookOpen,
+  HiOutlineUserCircle,
+  HiOutlineArrowRight
 } from "react-icons/hi";
-import { userService, groupService, paymentService } from "../../services/api";
+import { userService, groupService, courseService } from "../../services/api";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 
 const AdminDashboard = () => {
+  const navigate = useNavigate();
   const [user] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     studentsCount: 0,
     groupsCount: 0,
-    monthlyPayments: 0,
-    totalRevenue: 0,
-    recentPayments: []
+    teachersCount: 0,
+    coursesCount: 0
   });
+  const [recentTeachers, setRecentTeachers] = useState([]);
 
   const fetchDashboardData = useCallback(async () => {
     if (!user.branchId) return;
     setLoading(true);
     try {
-      const [uRes, gRes, pRes] = await Promise.all([
+      const [uRes, gRes, cRes] = await Promise.all([
         userService.getAll(),
         groupService.getAll(),
-        paymentService.getAll()
+        courseService.getAll()
       ]);
 
       const usersData = uRes?.data?.data || uRes?.data || [];
       const groupsData = gRes?.data?.data || gRes?.data || [];
-      const allPayments = pRes?.data?.data || pRes?.data || [];
+      const coursesData = cRes?.data?.data || cRes?.data || [];
 
-      // Filter by Branch
       const branchStudents = usersData.filter(u => u.role === 'student' && Number(u.branchId) === Number(user.branchId));
+      const branchTeachers = usersData.filter(u => u.role === 'teacher' && Number(u.branchId) === Number(user.branchId));
       const branchGroups = groupsData.filter(g => Number(g.branchId) === Number(user.branchId));
-      
-      // Calculate Revenue (for current month as an example)
-      const currentMonth = new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date());
-      const branchPayments = allPayments.filter(p => 
-        branchGroups.some(bg => Number(bg.id) === Number(p.groupId))
-      );
-
-      const totalRevenue = branchPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
-      const monthlyRevenue = branchPayments
-        .filter(p => p.month === currentMonth)
-        .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+      const branchCourses = coursesData.filter(c => Number(c.branchId) === Number(user.branchId));
 
       setStats({
         studentsCount: branchStudents.length,
         groupsCount: branchGroups.length,
-        monthlyPayments: monthlyRevenue,
-        totalRevenue: totalRevenue,
-        recentPayments: branchPayments.slice(-5).reverse() // Last 5 payments
+        teachersCount: branchTeachers.length,
+        coursesCount: branchCourses.length
       });
+
+      setRecentTeachers(branchTeachers.slice(0, 5));
     } catch (error) {
-      toast.error("Failed to fetch dashboard statistics");
+      toast.error("Ma'lumotlarni yuklab bo'lmadi");
       console.error(error);
     } finally {
       setLoading(false);
@@ -70,166 +63,152 @@ const AdminDashboard = () => {
     fetchDashboardData();
   }, [fetchDashboardData]);
 
-  const cards = [
-    { 
-      title: "Total Students", 
-      value: stats.studentsCount, 
-      icon: HiOutlineUsers, 
-      color: "text-blue-600", 
-      bg: "bg-blue-50",
-      trend: "+12%", 
-      trendUp: true 
-    },
-    { 
-      title: "Active Groups", 
-      value: stats.groupsCount, 
-      icon: HiOutlineAcademicCap, 
-      color: "text-indigo-600", 
-      bg: "bg-indigo-50",
-      trend: "Stable", 
-      trendUp: true 
-    },
-    { 
-      title: "Monthly Revenue", 
-      value: `${stats.monthlyPayments.toLocaleString()} UZS`, 
-      icon: HiOutlineTrendingUp, 
-      color: "text-emerald-600", 
-      bg: "bg-emerald-50",
-      trend: "Current Month", 
-      trendUp: true 
-    },
-    { 
-      title: "Total Balance", 
-      value: `${stats.totalRevenue.toLocaleString()} UZS`, 
-      icon: HiOutlineCurrencyDollar, 
-      color: "text-amber-600", 
-      bg: "bg-amber-50",
-      trend: "All Time", 
-      trendUp: true 
-    },
-  ];
-
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <div className="animate-spin rounded-full h-10 w-10 border-4 border-blue-600 border-t-transparent"></div>
       </div>
     );
   }
 
+  const statCards = [
+    { label: "Jami talabalar", value: stats.studentsCount, icon: <HiOutlineUsers size={32} />, color: "blue", path: "/admin/students" },
+    { label: "Faol guruhlar", value: stats.groupsCount, icon: <HiOutlineAcademicCap size={32} />, color: "amber", path: "/admin/groups" },
+    { label: "O'qituvchilar", value: stats.teachersCount, icon: <HiOutlineUserCircle size={32} />, color: "emerald", path: "/admin/teachers" },
+  ];
+
   return (
-    <div className="p-4 md:p-8 space-y-8 bg-[#fbfcfd] min-h-screen animate-in fade-in duration-700">
+    <div className="p-4 md:p-8 space-y-8 bg-[#f8fafc] min-h-screen">
       
       {/* Header Section */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-slate-800 tracking-tight">
-            Welcome back, <span className="text-indigo-600">{user.fullname || 'Admin'}</span>
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-8 rounded-[2.5rem] border border-gray-100 shadow-sm relative overflow-hidden group">
+        <div className="absolute top-0 right-0 w-64 h-64 bg-blue-50/50 rounded-full -mr-32 -mt-32 transition-transform duration-700 group-hover:scale-110"></div>
+        <div className="relative z-10">
+          <h1 className="text-3xl font-black text-gray-800 tracking-tight uppercase">
+            Xush kelibsiz, <span className="text-blue-600">{user.fullname || 'Administrator'}</span>
           </h1>
-          <p className="text-slate-400 font-bold text-xs uppercase tracking-widest mt-1">
-            System Overview
+          <p className="text-gray-400 text-sm font-medium italic mt-1">
+            Filialning bugungi statistik ko'rsatkichlari va boshqaruv paneli.
           </p>
         </div>
-        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl shadow-sm border border-slate-100">
-           <span className="text-xs font-black px-4 py-2 bg-slate-50 rounded-xl text-slate-500">
-             {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
+        <div className="relative z-10 bg-blue-50 px-6 py-3 rounded-2xl border border-blue-100 shadow-sm">
+           <span className="text-sm font-black text-blue-600 uppercase tracking-widest">
+             {new Date().toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' })}
            </span>
         </div>
       </div>
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
-        {cards.map((card, i) => (
-          <div key={i} className="bg-white p-6 rounded-[2.5rem] border border-slate-100 shadow-xl shadow-slate-200/50 hover:shadow-indigo-100 transition-all duration-300 group">
-            <div className="flex justify-between items-start mb-4">
-              <div className={`${card.bg} ${card.color} p-4 rounded-2xl transition-transform group-hover:scale-110`}>
-                <card.icon size={26} />
-              </div>
-              <button className="text-slate-300 hover:text-slate-500"><HiOutlineDotsVertical /></button>
-            </div>
-            <div>
-              <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">{card.title}</p>
-              <h3 className="text-2xl font-black text-slate-800 mb-2">{card.value}</h3>
-              <div className={`flex items-center gap-1 text-[10px] font-bold ${card.trendUp ? 'text-emerald-500' : 'text-rose-500'}`}>
-                {card.trendUp ? <HiOutlineArrowSmUp /> : <HiOutlineArrowSmDown />}
-                <span>{card.trend}</span>
-              </div>
+        {statCards.map((card, i) => (
+          <div 
+            key={i}
+            onClick={() => navigate(card.path)}
+            className="bg-white p-8 rounded-[2rem] border border-gray-100 cursor-pointer group relative overflow-hidden"
+          >
+            <div className={`absolute top-0 right-0 w-24 h-24 bg-${card.color}-50 rounded-bl-full opacity-50 -mr-12 -mt-12`}></div>
+            <div className="flex flex-col gap-6 relative z-10">
+                <div className={`w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center`}>
+                   <div className={`text-${card.color}-600`}>{card.icon}</div>
+                </div>
+                <div>
+                    <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] mb-1">{card.label}</p>
+                    <h3 className="text-3xl font-black text-gray-800 tracking-tighter">{card.value}</h3>
+                </div>
             </div>
           </div>
         ))}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        
-        {/* Recent Activity Table */}
-        <div className="lg:col-span-2 bg-white rounded-[2.5rem] border border-slate-100 shadow-sm overflow-hidden">
-          <div className="p-8 border-b border-slate-50 flex justify-between items-center">
-            <h2 className="text-xl font-black text-slate-800">Recent Payments</h2>
-            <button onClick={fetchDashboardData} className="text-xs font-bold text-indigo-600 hover:underline">Refresh Data</button>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-left">
-              <thead className="bg-slate-50/50">
-                <tr className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
-                  <th className="px-8 py-4">Student</th>
-                  <th className="px-8 py-4">Amount</th>
-                  <th className="px-8 py-4">Status</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-slate-50">
-                {stats.recentPayments.length > 0 ? stats.recentPayments.map((p, i) => (
-                  <tr key={i} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-8 py-5 font-bold text-slate-700 text-sm">
-                      {p.student?.fullname || "Unknown Student"}
-                    </td>
-                    <td className="px-8 py-5 font-black text-slate-900 text-sm">
-                      {Number(p.amount).toLocaleString()} UZS
-                    </td>
-                    <td className="px-8 py-5">
-                      <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-tighter border border-emerald-100">
-                        Completed
-                      </span>
-                    </td>
-                  </tr>
-                )) : (
-                  <tr>
-                    <td colSpan="3" className="px-8 py-10 text-center text-slate-400 italic font-medium">No recent transactions found</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        {/* Motivational Sidebar */}
-        <div className="space-y-6">
-          <div className="bg-indigo-600 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-200 relative overflow-hidden">
-            <div className="relative z-10">
-              <h2 className="text-2xl font-black mb-4 tracking-tight leading-tight">Branch Performance</h2>
-              <p className="text-indigo-100 text-sm font-medium leading-relaxed opacity-80 mb-6 italic">
-                "Education is the most powerful weapon which you can use to change the world."
-              </p>
-              <div className="flex items-center gap-4">
-                <div className="flex-1 bg-white/10 h-2 rounded-full overflow-hidden">
-                  <div className="bg-white h-full w-[75%] rounded-full shadow-[0_0_10px_white]"></div>
+          {/* Quick Actions */}
+          <div className="lg:col-span-1 space-y-6">
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
+                <div className="flex items-center gap-3 mb-8">
+                  <div className="p-2.5 bg-blue-50 text-blue-600 rounded-xl">
+                    <HiOutlineViewGrid size={20} />
+                  </div>
+                  <h3 className="text-sm font-black text-gray-800 uppercase tracking-[0.2em]">Tezkor amallar</h3>
                 </div>
-                <span className="text-xs font-black">75% Goal</span>
-              </div>
+                <div className="space-y-4">
+                    <button 
+                      onClick={() => navigate('/admin/students')}
+                      className="w-full flex items-center justify-between p-5 bg-gray-50 hover:bg-blue-600 text-gray-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] transition-all group border border-gray-100 hover:border-blue-600"
+                    >
+                        <span>Talaba qo'shish</span>
+                        <HiOutlinePlusCircle size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                    </button>
+                    <button 
+                      onClick={() => navigate('/admin/groups')}
+                      className="w-full flex items-center justify-between p-5 bg-gray-50 hover:bg-blue-600 text-gray-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] transition-all group border border-gray-100 hover:border-blue-600"
+                    >
+                        <span>Yangi guruh ochish</span>
+                        <HiOutlinePlusCircle size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                    </button>
+                    <button 
+                      onClick={() => navigate('/admin/teachers')}
+                      className="w-full flex items-center justify-between p-5 bg-gray-50 hover:bg-blue-600 text-gray-600 hover:text-white rounded-2xl font-black text-[10px] uppercase tracking-[0.15em] transition-all group border border-gray-100 hover:border-blue-600"
+                    >
+                        <span>O'qituvchi qo'shish</span>
+                        <HiOutlinePlusCircle size={20} className="text-blue-600 group-hover:text-white transition-colors" />
+                    </button>
+                </div>
             </div>
-            {/* Decorative circle */}
-            <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white/10 rounded-full blur-3xl"></div>
           </div>
 
-          <div className="bg-white rounded-[2.5rem] border border-slate-100 p-8 shadow-sm">
-            <h3 className="text-sm font-black text-slate-800 uppercase tracking-widest mb-4">Quick Shortcuts</h3>
-            <div className="grid grid-cols-2 gap-3">
-               <button className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all uppercase tracking-widest">Add Student</button>
-               <button className="p-4 bg-slate-50 rounded-2xl text-[10px] font-black text-slate-500 hover:bg-indigo-50 hover:text-indigo-600 transition-all uppercase tracking-widest">New Group</button>
+          {/* Recent Teachers */}
+          <div className="lg:col-span-2">
+            <div className="bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8 h-full">
+                <div className="flex items-center justify-between mb-8">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+                      <HiOutlineUserCircle size={20} />
+                    </div>
+                    <h3 className="text-sm font-black text-gray-800 uppercase tracking-[0.2em]">O'qituvchilar tarkibi</h3>
+                  </div>
+                  <button 
+                    onClick={() => navigate('/admin/teachers')}
+                    className="text-[10px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 hover:gap-3 transition-all"
+                  >
+                    Barchasi <HiOutlineArrowRight size={14} />
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-50">
+                          <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Ism sharifi</th>
+                          <th className="py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Telefon</th>
+                          <th className="py-4 text-right text-[10px] font-black text-gray-400 uppercase tracking-widest">Holat</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-50">
+                        {recentTeachers.length === 0 ? (
+                          <tr><td colSpan="3" className="py-10 text-center text-gray-400 font-bold italic">O'qituvchilar mavjud emas</td></tr>
+                        ) : recentTeachers.map((teacher, i) => (
+                          <tr key={i} className="group hover:bg-gray-50/50 transition-colors">
+                            <td className="py-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-8 h-8 rounded-lg bg-gray-900 text-white flex items-center justify-center font-bold text-xs uppercase">
+                                  {teacher.fullname?.charAt(0)}
+                                </div>
+                                <span className="font-bold text-gray-700 text-sm">{teacher.fullname}</span>
+                              </div>
+                            </td>
+                            <td className="py-4 text-xs font-bold text-gray-500">{teacher.phone}</td>
+                            <td className="py-4 text-right">
+                                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[9px] font-black uppercase tracking-widest border border-emerald-100">Faol</span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                </div>
             </div>
           </div>
-        </div>
-
       </div>
+
     </div>
   );
 };

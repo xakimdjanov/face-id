@@ -1,9 +1,9 @@
 import React, { useEffect, useState, useCallback, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { studentGroupService, attendanceService } from "../../services/api";
+import { studentGroupService, attendanceFaceService, employeeService } from "../../services/api";
 import toast from "react-hot-toast";
-import { HiOutlineArrowLeft, HiOutlineChevronLeft, HiOutlineChevronRight, HiCheck, HiX, HiClock } from "react-icons/hi";
-import { FiLoader } from "react-icons/fi";
+import { HiOutlineArrowLeft, HiOutlineChevronLeft, HiOutlineChevronRight } from "react-icons/hi";
+import { FiLoader, FiActivity } from "react-icons/fi";
 
 const TeacherListDetails = () => {
   const { state } = useLocation();
@@ -11,57 +11,69 @@ const TeacherListDetails = () => {
   const groupId = state?.groupId;
 
   const [students, setStudents] = useState([]);
-  const [attendance, setAttendance] = useState([]);
+  const [faceLogs, setFaceLogs] = useState([]);
+  const [employees, setEmployees] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [activeSelect, setActiveSelect] = useState(null);
+  const [activeSelect, setActiveSelect] = useState(null); // Used only for viewing details now
 
   const now = useMemo(() => new Date(), []);
   const [currentMonth, setCurrentMonth] = useState(now.getMonth());
   const [currentYear, setCurrentYear] = useState(now.getFullYear());
 
   const monthNames = [
-    "January", "February", "March", "April", "May", "June",
-    "July", "August", "September", "October", "November", "December"
+    "Yanvar", "Fevral", "Mart", "Aprel", "May", "Iyun",
+    "Iyul", "Avgust", "Sentyabr", "Oktyabr", "Noyabr", "Dekabr"
   ];
 
   const daysInMonth = useMemo(() => {
     return new Date(currentYear, currentMonth + 1, 0).getDate();
   }, [currentMonth, currentYear]);
 
-  // Quick lookup for attendance statuses
-  const attendanceMap = useMemo(() => {
+  const faceActivityMap = useMemo(() => {
     const map = new Map();
-    attendance.forEach(att => {
-      const dateKey = att.date?.split('T')[0];
-      const key = `${att.studentId}-${dateKey}`;
-      map.set(key, att.status);
+    if (!faceLogs.length || !employees.length) return { activity: map, userToEmp: {} };
+
+    const userToEmp = {};
+    employees.forEach(e => { if (e.userId) userToEmp[e.userId] = e.employeeNo; });
+
+    faceLogs.forEach(log => {
+      const dateKey = log.eventTime?.split('T')[0];
+      const key = `${log.employeeNo}-${dateKey}`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key).push(log);
     });
-    return map;
-  }, [attendance]);
+
+    return { activity: map, userToEmp };
+  }, [faceLogs, employees]);
 
   const fetchData = useCallback(async () => {
     if (!groupId) return;
     try {
       setLoading(true);
-      const [studentRes, attRes] = await Promise.all([
+      const start = new Date(currentYear, currentMonth, 1).toISOString();
+      const end = new Date(currentYear, currentMonth + 1, 0, 23, 59, 59).toISOString();
+
+      const [studentRes, faceRes, empRes] = await Promise.all([
         studentGroupService.getById(groupId),
-        attendanceService.getAll()
+        attendanceFaceService.getAll({ startDate: start, endDate: end, limit: 2000 }),
+        employeeService.getAll()
       ]);
+
       setStudents(studentRes?.data?.data || studentRes?.data || []);
-      setAttendance(attRes?.data?.data || attRes?.data || []);
+      setFaceLogs(faceRes?.data?.data || faceRes?.data || []);
+      setEmployees(empRes?.data?.data || empRes?.data || []);
     } catch (error) {
-      toast.error("Error loading data");
+       toast.error("Ma'lumotlarni yuklashda xatolik!");
     } finally {
       setLoading(false);
     }
-  }, [groupId]);
+  }, [groupId, currentMonth, currentYear]);
 
   useEffect(() => {
     if (!groupId) navigate("/teacher/attendance");
     else fetchData();
   }, [groupId, fetchData, navigate]);
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = () => setActiveSelect(null);
     if (activeSelect) {
@@ -70,105 +82,81 @@ const TeacherListDetails = () => {
     return () => window.removeEventListener("click", handleClickOutside);
   }, [activeSelect]);
 
-  const handleMark = async (studentId, day, status) => {
-    const selectedDate = new Date(currentYear, currentMonth, day);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-
-    if (selectedDate > today) {
-      toast.error("Cannot mark attendance for future dates");
-      return;
-    }
-
-    const dateString = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    try {
-      await attendanceService.register({ studentId, groupId, status, date: dateString });
-      toast.success("Saved");
-      setActiveSelect(null);
-      
-      setAttendance(prev => {
-        const filtered = prev.filter(a => !(Number(a.studentId) === Number(studentId) && a.date.startsWith(dateString)));
-        return [...filtered, { studentId, status, date: dateString }];
-      });
-    } catch (error) {
-      toast.error("Failed to save");
-    }
-  };
-
   if (loading) return (
-    <div className="flex flex-col h-screen items-center justify-center bg-slate-50 gap-4">
-      <FiLoader className="w-12 h-12 animate-spin text-indigo-600" />
-      <p className="text-slate-400 font-bold animate-pulse">Loading Journal...</p>
+    <div className="flex flex-col h-[80vh] items-center justify-center gap-4">
+      <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+      <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest animate-pulse">Jurnal yuklanmoqda...</p>
     </div>
   );
 
   return (
-    <div className="p-4 md:p-8 max-w-[100vw] min-h-screen bg-[#f8fafc]">
-      {/* Navigation */}
-      <button 
-        onClick={() => navigate(-1)} 
-        className="group flex items-center gap-2 text-slate-400 hover:text-indigo-600 mb-8 font-bold transition-all"
-      >
-        <div className="p-2 rounded-xl bg-white shadow-sm group-hover:bg-indigo-50 transition-all">
-          <HiOutlineArrowLeft size={18} />
-        </div>
-        Back to Groups
-      </button>
-
-      {/* Header Section */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 mb-8 bg-white p-8 rounded-[2.5rem] shadow-sm border border-slate-100">
-        <div className="flex items-center gap-5">
-          <div className="w-16 h-16 rounded-3xl bg-indigo-600 flex items-center justify-center text-white shadow-xl shadow-indigo-100 font-black text-2xl uppercase">
-            {state?.groupName?.charAt(0)}
-          </div>
-          <div>
-            <h1 className="text-3xl font-black text-slate-900 leading-none mb-2">{state?.groupName}</h1>
-            <p className="text-slate-400 font-medium flex items-center gap-2 text-sm">
-              <span className="inline-block w-2 h-2 rounded-full bg-emerald-500"></span>
-              Attendance Journal
-            </p>
-          </div>
+    <div className="p-4 md:p-8 max-w-full overflow-hidden min-h-screen space-y-8 animate-in fade-in duration-500">
+      {/* Navigation & Header */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 bg-white/50 backdrop-blur-md p-8 rounded-[2.5rem] border border-white shadow-sm">
+        <div className="flex items-center gap-6">
+           <button onClick={() => navigate(-1)} className="p-4 bg-white hover:bg-blue-600 text-slate-400 hover:text-white rounded-2xl shadow-sm border border-slate-100 transition-all active:scale-90 group">
+              <HiOutlineArrowLeft size={20} className="group-hover:-translate-x-1 transition-transform" />
+           </button>
+           <div className="flex items-center gap-5">
+              <div className="w-16 h-16 rounded-[1.5rem] bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-100 font-black text-2xl uppercase">
+                {state?.groupName?.charAt(0)}
+              </div>
+              <div>
+                <h1 className="text-2xl font-black text-slate-800 tracking-tight uppercase leading-none mb-1.5">{state?.groupName}</h1>
+                <p className="text-slate-400 font-bold flex items-center gap-2 text-[10px] uppercase tracking-widest">
+                  <span className="inline-block w-2 h-2 rounded-full bg-blue-500 animate-pulse"></span>
+                  Face ID Avtomatik Jurnal
+                </p>
+              </div>
+           </div>
         </div>
 
-        <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-[1.5rem] border border-slate-100">
+        <div className="flex items-center gap-3 bg-white p-2 rounded-2xl border border-slate-100 shadow-sm self-start md:self-auto">
           <button 
-            onClick={(e) => { e.stopPropagation(); setCurrentMonth(m => m === 0 ? 11 : m - 1); }}
-            className="p-3 bg-white rounded-2xl shadow-sm hover:text-indigo-600 transition-all active:scale-90"
+            onClick={(e) => { e.stopPropagation(); setCurrentMonth(m => m === 0 ? 11 : m - 1); fetchData(); }}
+            className="p-3 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-xl transition-all active:scale-90 shadow-sm"
           >
             <HiOutlineChevronLeft size={20} />
           </button>
-          <div className="px-6 text-center">
-            <span className="block font-black text-slate-800 uppercase tracking-tighter text-sm">
+          <div className="px-6 text-center min-w-[140px]">
+            <span className="block font-black text-slate-800 uppercase tracking-tighter text-xs">
               {monthNames[currentMonth]}
             </span>
-            <span className="text-[10px] font-bold text-slate-400">{currentYear}</span>
+            <span className="text-[10px] font-black text-blue-400 tracking-widest leading-none">{currentYear}</span>
           </div>
           <button 
-            onClick={(e) => { e.stopPropagation(); setCurrentMonth(m => m === 11 ? 0 : m + 1); }}
-            className="p-3 bg-white rounded-2xl shadow-sm hover:text-indigo-600 transition-all active:scale-90"
+            onClick={(e) => { e.stopPropagation(); setCurrentMonth(m => m === 11 ? 0 : m + 1); fetchData(); }}
+            className="p-3 bg-slate-50 hover:bg-blue-50 text-slate-400 hover:text-blue-600 rounded-xl transition-all active:scale-90 shadow-sm"
           >
             <HiOutlineChevronRight size={20} />
           </button>
         </div>
       </div>
 
-      {/* Table Section */}
-      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-xl overflow-visible">
-        <div className="overflow-x-auto scrollbar-hide pb-32">
+      {/* Grid Container */}
+      <div className="bg-white rounded-[3rem] border border-slate-100 shadow-2xl shadow-slate-200/40 relative overflow-hidden">
+        <div className="overflow-x-auto custom-scrollbar pb-32">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/50">
-                <th className="px-8 py-6 text-[11px] font-black text-slate-400 uppercase sticky left-0 bg-slate-50 z-40 border-r border-slate-100 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)]">
-                  Student Name
+              <tr className="bg-[#FBFCFE]">
+                <th className="px-10 py-8 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] sticky left-0 bg-[#FBFCFE] z-40 border-r border-slate-100/50 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.02)] min-w-[200px]">
+                  Talaba Ism-Sharifi
                 </th>
                 {[...Array(daysInMonth)].map((_, i) => {
                   const day = i + 1;
+                  const d = new Date(currentYear, currentMonth, day);
                   const isToday = now.getDate() === day && now.getMonth() === currentMonth && now.getFullYear() === currentYear;
-                  const isFuture = new Date(currentYear, currentMonth, day) > now;
+                  const isFuture = d > now;
+                  const dayName = d.toLocaleDateString('uz-UZ', { weekday: 'short' });
+
                   return (
-                    <th key={i} className={`px-2 py-6 text-[10px] font-black text-center min-w-[50px]
-                      ${isToday ? 'bg-indigo-50 text-indigo-600' : isFuture ? 'text-slate-200' : 'text-slate-400'}`}>
-                      {day}
+                    <th key={i} className={`px-2 py-6 text-center border-l border-slate-100/30 group/th min-w-[55px] ${isToday ? 'bg-blue-50/50' : ''}`}>
+                       <p className={`text-[10px] font-black uppercase tracking-tighter mb-1 transition-colors ${isToday ? 'text-blue-600' : isFuture ? 'text-slate-200' : 'text-slate-300'}`}>
+                          {dayName}
+                       </p>
+                       <div className={`w-8 h-8 rounded-xl mx-auto flex items-center justify-center text-[11px] font-black transition-all ${isToday ? 'bg-blue-600 text-white shadow-lg shadow-blue-200' : isFuture ? 'text-slate-200' : 'text-slate-500'}`}>
+                          {day}
+                       </div>
                     </th>
                   );
                 })}
@@ -176,45 +164,71 @@ const TeacherListDetails = () => {
             </thead>
             <tbody className="divide-y divide-slate-50">
               {students.map((student, sIdx) => (
-                <tr key={student.id} className="group hover:bg-slate-50/50">
-                  <td className="px-8 py-4 font-bold text-slate-700 whitespace-nowrap sticky left-0 bg-white z-30 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.05)] border-r border-slate-50 group-hover:bg-slate-50 text-sm">
-                    <span className="text-[10px] text-slate-300 mr-2 font-mono">{sIdx + 1}.</span>
-                    {student.student?.fullname}
+                <tr key={student.id} className="group hover:bg-blue-50/10">
+                  <td className="px-10 py-5 font-black text-slate-700 whitespace-nowrap sticky left-0 bg-white z-30 shadow-[4px_0_10px_-5px_rgba(0,0,0,0.03)] border-r border-slate-50 group-hover:bg-[#F8FBFF] transition-all">
+                    <div className="flex items-center gap-3">
+                       <span className="text-[10px] text-slate-300 font-mono tracking-tighter">{String(sIdx + 1).padStart(2, '0')}.</span>
+                       <span className="text-sm uppercase tracking-tight">{student.student?.fullname || student.fullname}</span>
+                    </div>
                   </td>
                   {[...Array(daysInMonth)].map((_, i) => {
                     const day = i + 1;
                     const dateKey = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const status = attendanceMap.get(`${student.studentId}-${dateKey}`);
                     const isActive = activeSelect === `${student.id}-${day}`;
                     const isToday = now.getDate() === day && now.getMonth() === currentMonth && now.getFullYear() === currentYear;
                     const isFuture = new Date(currentYear, currentMonth, day) > now;
 
+                    const logs = faceActivityMap.activity?.get(`${faceActivityMap.userToEmp[student.studentId]}-${dateKey}`);
+                    const isPresent = logs && logs.length > 0;
+
                     return (
-                      <td key={i} className={`p-1 relative border-l border-slate-50/50 ${isToday ? 'bg-indigo-50/30' : ''}`}>
+                      <td key={i} className={`p-1 position-relative border-l border-slate-50/50 ${isToday ? 'bg-blue-50/20' : ''}`}>
                         <button 
-                          disabled={isFuture}
-                          onClick={(e) => { e.stopPropagation(); setActiveSelect(isActive ? null : `${student.id}-${day}`); }}
-                          className={`w-9 h-9 rounded-xl mx-auto flex items-center justify-center transition-all duration-300
-                            ${isFuture ? 'opacity-10 cursor-not-allowed bg-transparent' : 'active:scale-90 cursor-pointer'}
-                            ${status === 'present' ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200' : 
-                              status === 'absent' ? 'bg-rose-500 text-white shadow-lg shadow-rose-200' : 
-                              status === 'late' ? 'bg-amber-500 text-white shadow-lg shadow-amber-200' : 
-                              !isFuture ? 'bg-slate-100 text-slate-300 hover:bg-slate-200 hover:text-slate-400' : ''}
+                          disabled={isFuture || !isPresent}
+                          onClick={(e) => { e.stopPropagation(); if(isPresent) setActiveSelect(isActive ? null : `${student.id}-${day}`); }}
+                          className={`w-10 h-10 rounded-[1.25rem] mx-auto flex items-center justify-center transition-all duration-300 relative border-2
+                            ${isFuture ? 'opacity-5 cursor-not-allowed border-transparent' : isPresent ? 'cursor-pointer' : 'cursor-default border-transparent'}
+                            ${isPresent ? 'bg-emerald-500 border-emerald-500 text-white shadow-lg shadow-emerald-100' : 
+                              !isFuture ? 'bg-slate-50 border-slate-100 text-slate-200' : ''}
                           `}
                         >
-                          <span className="text-[10px] font-black italic">
-                            {status === 'present' ? 'P' : status === 'absent' ? 'A' : status === 'late' ? 'L' : ''}
+                          <span className="text-[11px] font-black italic">
+                            {isPresent ? 'K' : !isFuture ? '' : ''}
                           </span>
                         </button>
 
-                        {isActive && !isFuture && (
+                        {isActive && isPresent && !isFuture && (
                           <div 
                             onClick={(e) => e.stopPropagation()}
-                            className="absolute top-full left-1/2 -translate-x-1/2 mt-2 z-[100] bg-white border border-slate-100 shadow-2xl rounded-[1.2rem] p-1.5 flex flex-col gap-0.5 min-w-[110px] animate-in slide-in-from-top-2 duration-200"
+                            className="absolute bottom-full left-1/2 -translate-x-1/2 mb-3 z-[100] bg-white border border-slate-100 shadow-2xl rounded-[2rem] p-4 flex flex-col gap-1 min-w-[160px] animate-in zoom-in-95 duration-200"
                           >
-                            <StatusBtn icon={<HiCheck />} label="Present" color="text-emerald-600" hover="hover:bg-emerald-50" onClick={() => handleMark(student.studentId, day, "present")} />
-                            <StatusBtn icon={<HiX />} label="Absent" color="text-rose-600" hover="hover:bg-rose-50" onClick={() => handleMark(student.studentId, day, "absent")} />
-                            <StatusBtn icon={<HiClock />} label="Late" color="text-amber-600" hover="hover:bg-amber-50" onClick={() => handleMark(student.studentId, day, "late")} />
+                            <p className="text-[9px] font-black text-blue-600 uppercase tracking-widest flex items-center gap-2 mb-2">
+                               <FiActivity size={12} />Face ID Skan
+                            </p>
+                            
+                            {(() => {
+                               const sorted = [...logs].sort((a,b) => new Date(a.eventTime) - new Date(b.eventTime));
+                               const first = sorted[0];
+                               const last = sorted[sorted.length - 1];
+                               const duration = new Date(last.eventTime) - new Date(first.eventTime);
+                               const h = Math.floor(duration / 3600000);
+                               const m = Math.floor((duration % 3600000) / 60000);
+
+                               return (
+                                 <div className="space-y-2">
+                                    <div className="space-y-1">
+                                       <div className="flex justify-between text-[10px] font-bold text-slate-400"><span>Kirish:</span> <span className="text-emerald-600">{new Date(first.eventTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                                       <div className="flex justify-between text-[10px] font-bold text-slate-400"><span>Chiqish:</span> <span className="text-rose-500">{new Date(last.eventTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span></div>
+                                       {duration > 0 && (
+                                         <div className="text-[9px] font-black text-blue-600 uppercase tracking-tight bg-blue-50 py-1.5 rounded-lg text-center mt-2 border border-blue-100">
+                                            {h}s {m}m binoda bo'ldi
+                                         </div>
+                                       )}
+                                    </div>
+                                    <p className="text-[8px] text-slate-300 font-bold uppercase text-center mt-1">Jami: {logs.length} ta skan</p>
+                                 </div>
+                               );
+                            })()}
                           </div>
                         )}
                       </td>
@@ -228,27 +242,26 @@ const TeacherListDetails = () => {
       </div>
 
       {/* Legend Footer */}
-      <div className="mt-8 flex flex-wrap gap-4 items-center">
-        <LegendItem color="bg-emerald-500" label="Present (P)" />
-        <LegendItem color="bg-rose-500" label="Absent (A)" />
-        <LegendItem color="bg-amber-500" label="Late (L)" />
-        <div className="ml-auto text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-6 py-3 rounded-full border border-slate-100 shadow-sm">
-          Total Students: {students.length}
+      <div className="flex flex-wrap items-center justify-between gap-6 px-4">
+        <div className="flex flex-wrap gap-4 items-center">
+            <LegendItem color="bg-emerald-500 shadow-emerald-200" label="Keldi (K)" />
+            <LegendItem color="bg-slate-100 border-slate-200" label="Yozuv yo'q" />
+            <div className="flex items-center gap-2 bg-blue-50/50 border border-blue-100 px-4 py-2 rounded-2xl">
+               <div className="w-2.5 h-2.5 bg-blue-600 rounded-full animate-pulse shadow-sm shadow-blue-400"></div>
+               <span className="text-[10px] font-black text-blue-600 uppercase tracking-widest">Face ID Avtomatik Rejim</span>
+            </div>
+        </div>
+        <div className="text-[10px] font-black text-slate-400 uppercase tracking-widest bg-white px-8 py-3 rounded-full border border-slate-100 shadow-sm flex items-center gap-4">
+           Guruh talabalari: <span className="text-slate-800 text-sm font-black">{students.length} ta</span>
         </div>
       </div>
     </div>
   );
 };
 
-const StatusBtn = ({ icon, label, color, hover, onClick }) => (
-  <button onClick={onClick} className={`flex items-center gap-2.5 px-3 py-2 ${hover} ${color} rounded-lg text-[10px] font-black transition-colors w-full`}>
-    {React.cloneElement(icon, { size: 14 })} {label}
-  </button>
-);
-
 const LegendItem = ({ color, label }) => (
-  <div className="flex items-center gap-2.5 bg-white px-4 py-2.5 rounded-2xl border border-slate-100 shadow-sm">
-    <div className={`w-2.5 h-2.5 ${color} rounded-full`}></div>
+  <div className="flex items-center gap-3 bg-white px-5 py-3 rounded-[1.25rem] border border-slate-100 shadow-sm group hover:border-blue-100 transition-colors">
+    <div className={`w-3 h-3 ${color} rounded-lg shadow-sm`}></div>
     <span className="text-[10px] font-black text-slate-600 uppercase tracking-tight">{label}</span>
   </div>
 );

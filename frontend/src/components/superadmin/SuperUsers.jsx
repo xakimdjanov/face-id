@@ -1,12 +1,14 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { branchService, userService } from "../../services/api";
 import { 
-  HiOutlineSearch, HiOutlineFilter, HiOutlineUsers, 
+  HiOutlineSearch, HiOutlineUsers, 
   HiOutlineOfficeBuilding, HiOutlineIdentification,
-  HiOutlinePencil, HiOutlineTrash, HiOutlineX, HiOutlineExclamation
+  HiOutlinePencil, HiOutlineTrash, HiOutlineX
 } from "react-icons/hi";
 import { CgSpinner } from "react-icons/cg";
 import toast from "react-hot-toast";
+import Swal from "sweetalert2";
+import Modal from "../ui/Modal";
 
 const SuperUsers = () => {
   const [branches, setBranches] = useState([]);
@@ -21,12 +23,11 @@ const SuperUsers = () => {
 
   // Modal states
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState(null);
   const [formLoading, setFormLoading] = useState(false);
 
   const [editForm, setEditForm] = useState({
-    fullname: "", email: "", phone: "", branchId: "", role: ""
+    fullname: "", phone: "", branchId: "", role: ""
   });
 
   const fetchData = useCallback(async () => {
@@ -54,7 +55,7 @@ const SuperUsers = () => {
     if (searchTerm) {
       filtered = filtered.filter(u => 
         u.fullname?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        u.email?.toLowerCase().includes(searchTerm.toLowerCase())
+        u.phone?.includes(searchTerm)
       );
     }
     if (selectedBranch) {
@@ -71,7 +72,6 @@ const SuperUsers = () => {
     setSelectedUser(user);
     setEditForm({
       fullname: user.fullname,
-      email: user.email,
       phone: user.phone || "",
       branchId: user.branchId || "",
       role: user.role
@@ -79,9 +79,35 @@ const SuperUsers = () => {
     setIsEditModalOpen(true);
   };
 
-  const handleDeleteClick = (user) => {
-    setSelectedUser(user);
-    setIsDeleteModalOpen(true);
+  const handleDeleteClick = async (user) => {
+    const result = await Swal.fire({
+      title: "O'chirish?",
+      text: `${user.fullname} profilini o'chirib tashlamoqchimisiz?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#ef4444",
+      cancelButtonColor: "#64748b",
+      confirmButtonText: "Ha, o'chirish",
+      cancelButtonText: "Bekor qilish",
+      background: "#ffffff",
+      color: "#1e293b",
+      customClass: {
+        popup: 'rounded-[2rem]'
+      }
+    });
+
+    if (result.isConfirmed) {
+      setLoading(true);
+      try {
+        await userService.delete(user.id);
+        toast.success("User deleted successfully");
+        fetchData();
+      } catch (error) {
+        toast.error("Failed to delete user");
+      } finally {
+        setLoading(false);
+      }
+    }
   };
 
   const handleUpdate = async (e) => {
@@ -99,19 +125,6 @@ const SuperUsers = () => {
     }
   };
 
-  const confirmDelete = async () => {
-    setFormLoading(true);
-    try {
-      await userService.delete(selectedUser.id);
-      toast.success("User deleted successfully");
-      setIsDeleteModalOpen(false);
-      fetchData();
-    } catch (error) {
-      toast.error("Failed to delete user");
-    } finally {
-      setFormLoading(false);
-    }
-  };
 
   const getRoleColor = (role) => {
     switch(role) {
@@ -128,14 +141,14 @@ const SuperUsers = () => {
     <div className="space-y-6 max-w-[1600px] mx-auto pb-10 p-4 font-sans">
       
       {/* HEADER SECTION */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 md:p-8 rounded-[2.5rem] border border-gray-100 shadow-sm">
         <div>
-          <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight uppercase">User Management</h1>
-          <p className="text-gray-500 text-sm">Control access levels and manage system personnel.</p>
+          <h1 className="text-2xl md:text-3xl font-black text-gray-800 tracking-tight uppercase tracking-tighter">Foydalanuvchilar</h1>
+          <p className="text-gray-500 text-sm font-medium italic mt-1">Barcha darajadagi tizim xodimlarini boshqarish.</p>
         </div>
-        <div className="flex items-center self-start md:self-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 px-5 py-2.5 rounded-2xl">
+        <div className="flex items-center self-start md:self-center gap-2 text-xs font-black text-blue-600 bg-blue-50 px-6 py-3 rounded-2xl uppercase tracking-[0.2em]">
           <HiOutlineUsers size={20} />
-          TOTAL: {filteredUsers.length}
+          JAMI: {filteredUsers.length}
         </div>
       </div>
 
@@ -144,9 +157,9 @@ const SuperUsers = () => {
         <div className="relative">
           <HiOutlineSearch className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <input 
-            type="text" placeholder="Search users..." value={searchTerm}
+            type="text" placeholder="Ism yoki telefon orqali qidirish..." value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm font-medium"
           />
         </div>
 
@@ -154,9 +167,9 @@ const SuperUsers = () => {
           <HiOutlineOfficeBuilding className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <select
             value={selectedBranch} onChange={(e) => setSelectedBranch(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm appearance-none cursor-pointer"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm appearance-none cursor-pointer font-medium"
           >
-            <option value="">All Branches</option>
+            <option value="">Barcha filiallar</option>
             {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </div>
@@ -165,12 +178,12 @@ const SuperUsers = () => {
           <HiOutlineIdentification className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
           <select
             value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm appearance-none cursor-pointer"
+            className="w-full pl-11 pr-4 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm appearance-none cursor-pointer font-medium"
           >
-            <option value="">All Roles</option>
-            <option value="student">Student</option>
-            <option value="teacher">Teacher</option>
-            <option value="manager">Manager</option>
+            <option value="">Barcha rollar</option>
+            <option value="student">O'quvchi</option>
+            <option value="teacher">O'qituvchi</option>
+            <option value="manager">Menejer</option>
             <option value="admin">Admin</option>
           </select>
         </div>
@@ -178,9 +191,9 @@ const SuperUsers = () => {
         {(searchTerm || selectedBranch || selectedRole) && (
           <button 
             onClick={() => {setSearchTerm(""); setSelectedBranch(""); setSelectedRole("");}} 
-            className="text-red-500 text-sm font-bold hover:bg-red-50 rounded-2xl py-3 transition-colors uppercase tracking-wider"
+            className="text-red-500 text-sm font-black hover:bg-red-50 rounded-2xl py-3 transition-colors uppercase tracking-[0.1em]"
           >
-            Reset Filters
+            Filtrlarni tozalash
           </button>
         )}
       </div>
@@ -191,11 +204,11 @@ const SuperUsers = () => {
           <table className="w-full text-left border-collapse min-w-[800px]">
             <thead>
               <tr className="bg-gray-50/50">
-                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Full Name</th>
-                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Contact Details</th>
-                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">System Role</th>
-                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest">Assigned Branch</th>
-                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Actions</th>
+                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">F.I.SH</th>
+                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Telefon raqami</th>
+                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Tizimdagi roli</th>
+                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em]">Biriktirilgan filial</th>
+                <th className="p-5 text-[10px] font-black text-gray-400 uppercase tracking-[0.2em] text-right">Amallar</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-50">
@@ -213,8 +226,7 @@ const SuperUsers = () => {
                       </div>
                     </td>
                     <td className="p-5 text-sm">
-                      <p className="font-semibold text-gray-700">{user.email}</p>
-                      <p className="text-gray-400 text-xs">{user.phone || "No phone"}</p>
+                      <p className="font-bold text-gray-700">{user.phone || "Mavjud emas"}</p>
                     </td>
                     <td className="p-5">
                       <span className={`px-3 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${getRoleColor(user.role)}`}>
@@ -222,7 +234,7 @@ const SuperUsers = () => {
                       </span>
                     </td>
                     <td className="p-5 text-sm font-bold text-gray-600">
-                      {user.branch?.name || <span className="text-gray-300 font-normal italic">Global</span>}
+                      {user.branch?.name || <span className="text-gray-300 font-black italic text-[10px] uppercase">Umumiy (Global)</span>}
                     </td>
                     <td className="p-5 text-right">
                       {user.role !== "superadmin" ? (
@@ -231,91 +243,80 @@ const SuperUsers = () => {
                           <button onClick={() => handleDeleteClick(user)} className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all"><HiOutlineTrash size={18} /></button>
                         </div>
                       ) : (
-                        <span className="text-[9px] font-bold text-gray-300 uppercase px-2 py-1 border border-gray-100 rounded">Protected</span>
+                        <span className="text-[9px] font-black text-gray-300 uppercase px-3 py-1 border border-gray-100 rounded-lg tracking-widest">Himoyalangan</span>
                       )}
                     </td>
                   </tr>
                 ))
               ) : (
-                <tr><td colSpan="5" className="p-20 text-center text-gray-400">No matching users found.</td></tr>
+                <tr><td colSpan="5" className="p-20 text-center text-gray-400 font-medium italic">Foydalanuvchilar topilmadi.</td></tr>
               )}
             </tbody>
           </table>
         </div>
       </div>
 
-      {/* EDIT MODAL (RESPONSIVE) */}
-      {isEditModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsEditModalOpen(false)}></div>
-          <div className="bg-white w-full max-w-lg rounded-[2.5rem] shadow-2xl relative animate-in zoom-in duration-200 overflow-hidden">
-            <div className="p-6 md:p-8 flex justify-between items-center border-b border-gray-100">
-              <h2 className="text-xl md:text-2xl font-black text-gray-800 uppercase tracking-tighter">Edit User Profile</h2>
-              <button onClick={() => setIsEditModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-xl text-gray-400 transition-colors"><HiOutlineX size={24} /></button>
-            </div>
-            
-            <form onSubmit={handleUpdate} className="p-6 md:p-8 space-y-4">
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Full Name</label>
-                <input type="text" required value={editForm.fullname} onChange={(e) => setEditForm({...editForm, fullname: e.target.value})} className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm"/>
-              </div>
-              
-              <div className="space-y-1">
-                <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Email & Phone</label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <input type="email" required value={editForm.email} onChange={(e) => setEditForm({...editForm, email: e.target.value})} className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm"/>
-                  <input type="text" value={editForm.phone} onChange={(e) => setEditForm({...editForm, phone: e.target.value})} className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm"/>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Role Assignment</label>
-                  <select value={editForm.role} onChange={(e) => setEditForm({...editForm, role: e.target.value})} className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm cursor-pointer appearance-none">
-                    <option value="student">Student</option>
-                    <option value="teacher">Teacher</option>
-                    <option value="manager">Manager</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-black text-gray-400 uppercase ml-2">Branch</label>
-                  <select value={editForm.branchId} onChange={(e) => setEditForm({...editForm, branchId: e.target.value})} className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm cursor-pointer appearance-none">
-                    <option value="">Global / None</option>
-                    {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
-                  </select>
-                </div>
-              </div>
-
-              <button disabled={formLoading} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-95 mt-4">
-                {formLoading ? <CgSpinner className="animate-spin text-2xl mx-auto" /> : "SAVE CHANGES"}
-              </button>
-            </form>
+      {/* EDIT MODAL */}
+      <Modal 
+        isOpen={isEditModalOpen} 
+        onClose={() => setIsEditModalOpen(false)} 
+        title="Foydalanuvchi ma'lumotlarini tahrirlash"
+      >
+        <form onSubmit={handleUpdate} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">To'liq ismi (F.I.SH)</label>
+            <input 
+              type="text" required value={editForm.fullname} 
+              onChange={(e) => setEditForm({...editForm, fullname: e.target.value})} 
+              className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm"
+            />
           </div>
-        </div>
-      )}
+          
+          <div className="space-y-1">
+            <label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Telefon raqami</label>
+            <input 
+              type="text" required value={editForm.phone} 
+              onChange={(e) => setEditForm({...editForm, phone: e.target.value})} 
+              className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm" 
+              placeholder="+998901234567"
+            />
+          </div>
 
-      {/* DELETE MODAL (RESPONSIVE) */}
-      {isDeleteModalOpen && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
-          <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={() => setIsDeleteModalOpen(false)}></div>
-          <div className="bg-white w-full max-w-md rounded-[2.5rem] shadow-2xl p-6 md:p-10 relative text-center animate-in zoom-in duration-200">
-            <div className="w-20 h-20 bg-red-50 text-red-500 rounded-full flex items-center justify-center mx-auto mb-6">
-              <HiOutlineExclamation size={40} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Tizimdagi roli</label>
+              <select 
+                value={editForm.role} 
+                onChange={(e) => setEditForm({...editForm, role: e.target.value})} 
+                className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm cursor-pointer appearance-none"
+              >
+                <option value="student">Student</option>
+                <option value="teacher">Teacher</option>
+                <option value="manager">Manager</option>
+                <option value="admin">Admin</option>
+              </select>
             </div>
-            <h2 className="text-2xl font-black text-gray-800 mb-2 uppercase tracking-tighter">Are you sure?</h2>
-            <p className="text-gray-500 text-sm mb-8">
-              You are about to delete <span className="font-bold text-gray-800">{selectedUser?.fullname}</span>. This action is permanent.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-3">
-              <button onClick={() => setIsDeleteModalOpen(false)} className="flex-1 py-3.5 bg-gray-100 hover:bg-gray-200 text-gray-600 font-bold rounded-2xl transition-all">CANCEL</button>
-              <button onClick={confirmDelete} disabled={formLoading} className="flex-1 py-3.5 bg-red-600 hover:bg-red-700 text-white font-bold rounded-2xl shadow-lg shadow-red-100 transition-all active:scale-95 flex items-center justify-center">
-                {formLoading ? <CgSpinner className="animate-spin text-xl" /> : "DELETE USER"}
-              </button>
+            <div className="space-y-1">
+              <label className="text-[10px] font-black text-gray-400 uppercase ml-2 tracking-widest">Filial</label>
+              <select 
+                value={editForm.branchId} 
+                onChange={(e) => setEditForm({...editForm, branchId: e.target.value})} 
+                className="w-full px-5 py-3 bg-gray-50 border-2 border-transparent rounded-2xl focus:bg-white focus:border-blue-500 outline-none transition-all text-sm cursor-pointer appearance-none"
+              >
+                <option value="">Umumiy / Mavjud emas</option>
+                {branches.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+              </select>
             </div>
           </div>
-        </div>
-      )}
+
+          <button 
+            disabled={formLoading} 
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-black py-4 rounded-2xl shadow-xl shadow-blue-100 transition-all active:scale-95 mt-4"
+          >
+            {formLoading ? <CgSpinner className="animate-spin text-2xl mx-auto" /> : "O'ZGARISHLARNI SAQLASH"}
+          </button>
+        </form>
+      </Modal>
     </div>
   );
 };

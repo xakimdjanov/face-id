@@ -2,26 +2,24 @@ import React, { useEffect, useState, useCallback } from "react";
 import {
   groupService,
   userService,
-  paymentService,
   studentGroupService
 } from "../../services/api";
 import { 
   HiOutlineUserGroup, HiOutlineAcademicCap, 
-  HiOutlineCollection, HiOutlineCurrencyDollar,
-  HiOutlineTrendingUp
+  HiOutlineCollection, 
+  HiOutlineTrendingUp,
+  HiOutlineLightningBolt,
+  HiOutlineCalendar
 } from "react-icons/hi";
 import toast from "react-hot-toast";
 
 const ManagerDashboard = () => {
-  // Foydalanuvchini xavfsiz olish
   const [user] = useState(() => JSON.parse(localStorage.getItem("user") || "{}"));
 
   const [stats, setStats] = useState({
     groups: 0,
     teachers: 0,
     students: 0,
-    totalPayments: 0,
-    revenue: 0
   });
   const [recentStudents, setRecentStudents] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -31,54 +29,37 @@ const ManagerDashboard = () => {
 
     try {
       setLoading(true);
-      
-      // 1. Fetching main data
-      const [groupRes, userRes, paymentRes] = await Promise.all([
+      const [groupRes, userRes] = await Promise.all([
         groupService.getAll(),
-        userService.getAll(),
-        paymentService.getAll()
+        userService.getAll()
       ]);
 
-      // Data extraction (safeguard for res.data.data or res.data)
       const allGroups = groupRes?.data?.data || groupRes?.data || [];
       const allUsers = userRes?.data?.data || userRes?.data || [];
-      const allPayments = paymentRes?.data?.data || paymentRes?.data || [];
 
-      // Branch filters
       const branchGroups = allGroups.filter(g => Number(g.branchId) === Number(user.branchId));
-      const groupIds = branchGroups.map(g => g.id);
-
+      
       const branchTeachers = allUsers.filter(
         u => u.role === "teacher" && Number(u.branchId) === Number(user.branchId)
       );
 
-      // 2. Fetch Students for branch groups
       const studentPromises = branchGroups.map(g => studentGroupService.getById(g.id));
       const studentResults = await Promise.all(studentPromises);
       
-      // Flatten all student-group relations
       const allStudentEntries = studentResults.flatMap(res => res?.data?.data || res?.data || []);
-      
-      // Get Unique Students (by studentId)
       const uniqueStudentIds = [...new Set(allStudentEntries.map(s => s.studentId))];
-
-      // 3. Financial calculations
-      const branchPayments = allPayments.filter(p => groupIds.includes(Number(p.groupId)));
-      const totalRevenue = branchPayments.reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
       setStats({
         groups: branchGroups.length,
         teachers: branchTeachers.length,
-        students: uniqueStudentIds.length,
-        totalPayments: branchPayments.length,
-        revenue: totalRevenue
+        students: uniqueStudentIds.length
       });
 
       setRecentStudents(allStudentEntries.slice(-5).reverse());
       
     } catch (error) {
       console.error("Dashboard error:", error);
-      toast.error("Failed to refresh dashboard metrics");
+      toast.error("Ma'lumotlarni yangilashda xatolik yuz berdi");
     } finally {
       setLoading(false);
     }
@@ -88,141 +69,131 @@ const ManagerDashboard = () => {
     loadData();
   }, [loadData]);
 
-  const formatCurrency = (val) => 
-    new Intl.NumberFormat('uz-UZ').format(val) + " UZS";
-
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+      <div className="flex flex-col h-[70vh] items-center justify-center gap-4">
+        <div className="w-12 h-12 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+        <p className="text-slate-400 font-black text-[10px] uppercase tracking-widest animate-pulse">Statistikalar yuklanmoqda...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-8 animate-in fade-in duration-700">
+    <div className="p-4 md:p-8 space-y-10">
       
       {/* WELCOME HEADER */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <div>
-          <h1 className="text-3xl font-black text-gray-800 tracking-tight">Executive Overview</h1>
-          <p className="text-gray-500 font-medium">Welcome back, manager.</p>
-        </div>
-        <div className="bg-indigo-600 text-white px-5 py-2 rounded-2xl flex items-center gap-3 shadow-lg shadow-indigo-100">
-          <div className="p-2 bg-indigo-500 rounded-xl">
-            <HiOutlineTrendingUp size={20}/>
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 bg-white/50 backdrop-blur-md p-8 rounded-[2.5rem] border border-white shadow-sm">
+        <div className="flex items-center gap-6">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl shadow-blue-200">
+             <HiOutlineLightningBolt size={32} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase opacity-80 tracking-widest">Branch Status</p>
-            <p className="text-sm font-bold">Operational</p>
+            <h1 className="text-3xl font-black text-slate-800 tracking-tight uppercase tracking-tighter">Filial Tahlili</h1>
+            <p className="text-slate-500 font-medium mt-1">Xush kelibsiz, <span className="text-blue-600 font-black leading-none">{user.fullname}</span>. Bugungi holat bilan tanishing.</p>
           </div>
+        </div>
+        <div className="flex items-center gap-3 bg-white px-6 py-3 rounded-2xl border border-slate-100 shadow-sm">
+           <HiOutlineCalendar className="text-blue-500" size={20} />
+           <span className="font-bold text-slate-700">{new Date().toLocaleDateString('uz-UZ', { day: 'numeric', month: 'long', year: 'numeric' })}</span>
         </div>
       </div>
 
       {/* STATS GRID */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard 
-          title="Active Groups" 
+          title="Faol guruhlar" 
           value={stats.groups} 
-          icon={<HiOutlineCollection size={24}/>} 
-          color="bg-indigo-600" 
+          icon={<HiOutlineCollection size={28}/>} 
+          color="bg-blue-600 shadow-blue-100" 
         />
         <StatCard 
-          title="Faculty Members" 
+          title="O'qituvchilar" 
           value={stats.teachers} 
-          icon={<HiOutlineAcademicCap size={24}/>} 
-          color="bg-emerald-500" 
+          icon={<HiOutlineAcademicCap size={28}/>} 
+          color="bg-slate-800 shadow-slate-100" 
         />
         <StatCard 
-          title="Total Students" 
+          title="Jami talabalar" 
           value={stats.students} 
-          icon={<HiOutlineUserGroup size={24}/>} 
-          color="bg-blue-500" 
-        />
-        <StatCard 
-          title="Total Revenue" 
-          value={formatCurrency(stats.revenue)} 
-          icon={<HiOutlineCurrencyDollar size={24}/>} 
-          color="bg-amber-500" 
-          isCurrency
+          icon={<HiOutlineUserGroup size={28}/>} 
+          color="bg-blue-500 shadow-blue-100" 
         />
       </div>
 
       {/* RECENT ACTIVITY */}
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
-        <div className="xl:col-span-2 bg-white rounded-[2.5rem] border border-gray-100 shadow-sm p-8">
-          <div className="flex justify-between items-center mb-6">
-            <h2 className="text-xl font-black text-gray-800">New Enrollments</h2>
-            <span className="text-xs font-bold text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full uppercase">Latest 5</span>
+      <div className="bg-white rounded-[2.5rem] border border-slate-100 shadow-2xl shadow-slate-200/40 overflow-hidden">
+          <div className="p-10 flex justify-between items-center border-b border-slate-50">
+            <div>
+              <h2 className="text-xl font-black text-slate-800 uppercase tracking-tighter mb-1">Yaqinda qo'shilganlar</h2>
+              <p className="text-slate-400 text-[10px] font-bold uppercase tracking-widest">Filial bo'yicha oxirgi 5 ta talaba</p>
+            </div>
+            <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 text-blue-600 rounded-xl border border-blue-100">
+               <HiOutlineTrendingUp size={18} />
+               <span className="text-[10px] font-black uppercase tracking-widest">Aktivlik</span>
+            </div>
           </div>
           
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="text-[10px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-50">
-                  <th className="pb-4 px-2">Student Name</th>
-                  <th className="pb-4 px-2">Email Address</th>
-                  <th className="pb-4 px-2 text-right">Status</th>
+                <tr className="bg-slate-50/50">
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Talaba ismi-sharifi</th>
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Telefon raqami</th>
+                  <th className="px-10 py-6 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] text-right">Status</th>
                 </tr>
               </thead>
-              <tbody className="divide-y divide-gray-50">
+              <tbody className="divide-y divide-slate-50">
                 {recentStudents.length > 0 ? recentStudents.map((entry, idx) => (
-                  <tr key={idx} className="group hover:bg-gray-50/50 transition-colors">
-                    <td className="py-4 px-2">
-                      <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-lg bg-gray-100 flex items-center justify-center text-xs font-bold text-gray-500">
+                  <tr key={idx} className="group hover:bg-blue-50/10 transition-all duration-300">
+                    <td className="px-10 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-10 h-10 rounded-xl bg-slate-50 text-blue-600 flex items-center justify-center font-black text-sm border border-slate-100 group-hover:bg-blue-600 group-hover:text-white transition-all">
                           {entry.student?.fullname?.charAt(0) || "S"}
                         </div>
-                        <span className="text-sm font-bold text-gray-700">{entry.student?.fullname || "Unnamed Student"}</span>
+                        <span className="text-sm font-black text-slate-700 tracking-tight uppercase">{entry.student?.fullname || "Ismsiz talaba"}</span>
                       </div>
                     </td>
-                    <td className="py-4 px-2 text-sm text-gray-500 font-medium">
-                      {entry.student?.email || "N/A"}
+                    <td className="px-10 py-5 text-sm text-slate-500 font-bold">
+                      {entry.student?.phone || "Kiritilmagan"}
                     </td>
-                    <td className="py-4 px-2 text-right">
-                      <span className="px-2 py-1 bg-emerald-50 text-emerald-600 rounded-md text-[10px] font-black uppercase tracking-tighter border border-emerald-100">Active</span>
+                    <td className="px-10 py-5 text-right">
+                      <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-emerald-50 text-emerald-600 rounded-lg text-[10px] font-black uppercase tracking-widest border border-emerald-100">
+                         <div className="w-1 h-1 bg-emerald-600 rounded-full animate-pulse" />
+                         Faol
+                      </span>
                     </td>
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan="3" className="py-10 text-center text-gray-400 font-medium">No students found for this branch.</td>
+                    <td colSpan="3" className="py-24 text-center">
+                       <div className="flex flex-col items-center gap-4">
+                          <HiOutlineUserGroup size={60} className="text-slate-100" />
+                          <p className="text-slate-400 font-black text-sm uppercase tracking-widest italic">Hozircha ma'lumotlar mavjud emas.</p>
+                       </div>
+                    </td>
                   </tr>
                 )}
               </tbody>
             </table>
           </div>
-        </div>
-
-        {/* REFRESH CARD */}
-        <div className="bg-indigo-900 rounded-[2.5rem] p-8 text-white flex flex-col justify-between shadow-2xl shadow-indigo-200">
-          <div>
-            <h2 className="text-xl font-black mb-4 leading-tight">Branch Management Tip</h2>
-            <p className="text-indigo-200 text-sm leading-relaxed mb-6">
-              Regularly monitor groups with fewer than 5 students to optimize faculty allocation and branch profitability.
-            </p>
-          </div>
-          <button 
-            onClick={loadData}
-            className="w-full bg-white/10 hover:bg-white text-indigo-900 hover:text-indigo-900 transition-all py-4 rounded-2xl font-black text-xs uppercase tracking-widest border border-white/10"
-          >
-            Refresh Dashboard
-          </button>
-        </div>
       </div>
     </div>
   );
 };
 
-const StatCard = ({ title, value, icon, color, isCurrency }) => (
-  <div className="bg-white p-6 rounded-[2rem] border border-gray-100 shadow-sm flex items-center gap-5 transition-all hover:shadow-md">
-    <div className={`w-14 h-14 rounded-2xl ${color} text-white flex items-center justify-center shadow-lg shadow-gray-50`}>
+const StatCard = ({ title, value, icon, color }) => (
+  <div className="bg-white p-8 rounded-[2.5rem] border border-slate-100 shadow-sm flex items-center gap-6 group hover:shadow-2xl hover:shadow-blue-200/40 hover:border-blue-100 transition-all duration-500 relative overflow-hidden">
+    <div className="absolute top-0 right-0 p-10 bg-slate-50 rounded-full translate-x-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
+    
+    <div className={`w-16 h-16 rounded-2xl ${color} text-white flex items-center justify-center shadow-lg relative z-10 group-hover:scale-110 transition-transform`}>
       {icon}
     </div>
-    <div>
-      <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{title}</p>
-      <p className={`${isCurrency ? 'text-base' : 'text-3xl'} font-black text-gray-800 tracking-tight`}>
-        {value}
-      </p>
+    <div className="relative z-10">
+      <p className="text-slate-400 text-[10px] font-black uppercase tracking-[0.2em] mb-1.5">{title}</p>
+      <div className="flex items-baseline gap-1">
+        <h2 className="text-3xl font-black text-slate-800 leading-none">{value}</h2>
+        <span className="text-[10px] font-black text-slate-300 uppercase tracking-tighter">ta</span>
+      </div>
     </div>
   </div>
 );
