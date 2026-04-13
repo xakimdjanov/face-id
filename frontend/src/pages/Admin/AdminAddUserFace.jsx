@@ -28,10 +28,11 @@ import {
   employeeService,
   deviceService,
   courseService,
+  API_BASE_URL,
 } from "../../services/api";
 
-const API = "http://localhost:5000";
-const WS_URL = "ws://localhost:5000/ws/enroll";
+const API = API_BASE_URL;
+const WS_URL = API_BASE_URL.replace("http", "ws") + "/ws/enroll";
 
 export default function AdminAddUserFace() {
   const navigate = useNavigate();

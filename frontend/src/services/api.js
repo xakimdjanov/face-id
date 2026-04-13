@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_BASE_URL = "https://snubbier-cicatrisant-clara.ngrok-free.dev"; // 5000 portga o'zgartirildi
+export const API_BASE_URL = "https://snubbier-cicatrisant-clara.ngrok-free.dev"; // 5000 portga o'zgartirildi
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
